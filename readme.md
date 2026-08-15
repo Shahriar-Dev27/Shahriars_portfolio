@@ -17,7 +17,7 @@ This is the personal portfolio of **Shahriar Islam Dip** — a Computer Science 
 
 ## 📸 Preview
 
-![Portfolio Screenshot](images/portfolio-screenshot.png)
+![Portfolio Screenshot](images/screenshotPortfolio.png)
 
 *Hero section with dual-mode selector, interactive portrait reveal, and liquid WebGL background*
 
