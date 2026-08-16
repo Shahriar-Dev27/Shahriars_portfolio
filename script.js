@@ -1582,8 +1582,6 @@ function syncProjectMode(mode = appState.mode) {
     if (!project) return;
     const emphasized = mode === "design" ? ["frontend", "experiment"].includes(project.category) : project.category === "full-stack";
     card.classList.toggle("is-mode-emphasized", emphasized);
-    const relevant = mode === "design" ? project.designTechnologies : project.developTechnologies;
-    card.querySelectorAll("[data-technology]").forEach((item) => item.classList.toggle("is-mode-relevant", relevant.includes(item.dataset.technology)));
   });
 }
 
@@ -2044,7 +2042,7 @@ function initScrollReveals() {
 
   /* Project imagery parallax inside its frame, via CSS vars to stay
      composable with the existing hover transforms. */
-  document.querySelectorAll(".project-card:not([data-project-id='bizguide-ai']) .project-card__media").forEach((media) => {
+  document.querySelectorAll(".project-card:not([data-project-id='bizguide-ai']) .project-card__thumb").forEach((media) => {
     extraTweens.push(gsap.fromTo(media, { "--media-shift": "-5.5%" }, {
       "--media-shift": "5.5%",
       ease: "none",
