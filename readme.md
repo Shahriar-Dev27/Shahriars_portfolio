@@ -71,7 +71,7 @@ The_Portfolio/
 ├── images/
 │   ├── developer-placeholder.png   # Hero portrait (1067×1402)
 │   ├── socialpage.png              # Statement section portrait (1122×1402)
-│   ├── portfolio-screenshot.png    # Portfolio preview screenshot
+│   ├── screenshotPortfolio.png     # Portfolio preview screenshot
 │   └── projects/
 │       └── BizStudio.png           # BizGuide AI case study image (1895×905)
 └── README.md               # This file
