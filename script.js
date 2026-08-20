@@ -6,6 +6,9 @@ const MODE_STORAGE_KEY = "portfolio-preferred-mode";
 const PROJECT_FILTER_SESSION_KEY = "portfolio-project-filter";
 const MAX_CANVAS_DPR = 2;
 
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+window.addEventListener("pageshow", () => window.scrollTo({ top: 0, left: 0, behavior: "instant" }), { once: true });
+
 const portfolioModes = {
   design: {
     eyebrow: "Creative Frontend / UI Engineering",
@@ -2466,14 +2469,15 @@ function selectProfileCard(targetSelector, options = {}) {
 
   // Smooth scroll to card
   if (scroll) {
+    const headerOffset = window.innerWidth <= 767
+      ? Math.ceil(profileDossierRuntime.section.querySelector(".profile-rail")?.getBoundingClientRect().height || 100) + 20
+      : 90;
     if (revealRuntime?.lenis && !appState.reducedMotion) {
-      const headerOffset = window.innerWidth <= 767 ? -120 : -90;
       revealRuntime.lenis.scrollTo(targetCard, {
-        offset: headerOffset,
+        offset: -headerOffset,
         duration: 1.1,
       });
     } else {
-      const headerOffset = window.innerWidth <= 767 ? 120 : 90;
       const targetPos = targetCard.getBoundingClientRect().top + window.scrollY - headerOffset;
       window.scrollTo({
         top: targetPos,
@@ -2520,7 +2524,6 @@ function initProfileDossier() {
     navList,
     mobileStep,
     mobileLabel,
-    triggers: [],
   };
 
   const mobileProfileQuery = window.matchMedia("(max-width: 47.99rem)");
@@ -2556,62 +2559,29 @@ function initProfileDossier() {
     selectProfileCard(nextBtn.dataset.profileTarget, { scroll: true, focus: true, announce: true });
   });
 
-  // GSAP ScrollTrigger Integration
-  if (window.ScrollTrigger && !appState.reducedMotion) {
-    cards.forEach((card, index) => {
-      const isFirst = index === 0;
-      const isLast = index === cards.length - 1;
-      const trigger = ScrollTrigger.create({
-        trigger: card,
-        start: isFirst ? "top 80%" : "top 50%",
-        end: isLast ? "bottom 20%" : "bottom 50%",
-        onEnter: () => selectProfileCard(`#${card.id}`, { scroll: false }),
-        onEnterBack: () => selectProfileCard(`#${card.id}`, { scroll: false }),
-        onToggle: (self) => {
-          if (self.isActive) selectProfileCard(`#${card.id}`, { scroll: false });
-        },
-      });
-      profileDossierRuntime.triggers.push(trigger);
-    });
+  // One direction-independent position check keeps the rail in sync in both scroll directions.
+  const syncProfileFromScroll = () => {
+    updateProfileProgress();
+    const threshold = window.innerHeight * 0.45;
+    let activeCard = cards[0];
+    let minDistance = Infinity;
 
-    const progressTrigger = ScrollTrigger.create({
-      trigger: section,
-      start: "top 70%",
-      end: "bottom 30%",
-      scrub: true,
-      onUpdate: (self) => {
-        if (progressBar) {
-          progressBar.style.setProperty("--profile-progress", `${(self.progress * 100).toFixed(1)}%`);
-        }
-      },
-    });
-    profileDossierRuntime.triggers.push(progressTrigger);
-  } else {
-    // Native scroll listener fallback
-    window.addEventListener("scroll", () => {
-      updateProfileProgress();
-      const threshold = window.innerHeight * 0.45;
-      let activeCard = cards[0];
-      let minDistance = Infinity;
-
-      cards.forEach((card) => {
-        const rect = card.getBoundingClientRect();
-        if (rect.top <= threshold && rect.bottom >= threshold) {
-          activeCard = card;
-        } else {
-          const distance = Math.abs(rect.top - threshold);
-          if (distance < minDistance) {
-            minDistance = distance;
-            activeCard = card;
-          }
-        }
-      });
-
-      if (activeCard) {
-        selectProfileCard(`#${activeCard.id}`, { scroll: false });
+    cards.forEach((card) => {
+      const rect = card.getBoundingClientRect();
+      const distance = rect.top <= threshold && rect.bottom >= threshold
+        ? 0
+        : Math.abs(rect.top - threshold);
+      if (distance < minDistance) {
+        minDistance = distance;
+        activeCard = card;
       }
-    }, { passive: true });
-  }
+    });
+
+    if (activeCard && !activeCard.classList.contains("is-active")) {
+      selectProfileCard(`#${activeCard.id}`, { scroll: false });
+    }
+  };
+  window.addEventListener("scroll", syncProfileFromScroll, { passive: true });
 }
 
 function initBackToTop() {
