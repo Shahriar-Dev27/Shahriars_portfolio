@@ -1,0 +1,115 @@
+# Mobile Redesign Plan: Profile & Career Section
+
+A comprehensive redesign proposal and implementation plan for the **Profile & Career Dossier** (`#profile`), focusing specifically on mobile screen display, intuitive sequential navigation, an upgraded Tech Arsenal layout, and a text-first certification display.
+
+---
+
+## 1. Overview of Mobile Experience Redesign
+
+### Current Desktop/Tablet Structure
+On desktop and tablet screens, the Profile section operates as a **Dual-Track Dossier**:
+- **Left Column**: Sticky navigation rail with 6 categories (01 Bio, 02 Experience, 03 Tech Arsenal, 04 Education, 05 Milestones, 06 Certifications) with a vertical progress track.
+- **Right Column**: Content cards stacked vertically with rich editorial details.
+
+### Target Mobile Architecture (Screen width < 768px)
+```
+┌────────────────────────────────────────────────────────┐
+│  [Pinned Header] SID                             ( ≡ ) │
+├────────────────────────────────────────────────────────┤
+│  [Sticky Mobile Dossier Tracker]                       │
+│  [ 01 Bio ] [ 02 Exp ] [ 03 Tech ] [ 04 Edu ] ...      │
+│  [████████████████░░░░░░░░░░░░░░░░] 03/06 Tech Arsenal │
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│  [Active Card Content Area - e.g. 03 Tech Arsenal]     │
+│  - Category Filter Pills (Frontend / Backend / DB)     │
+│  - Interactive Tech Capability Cards                   │
+│  - Clear text badges with icons and proficiency        │
+│                                                        │
+│  [Next Card Content Area - 04 Education]               │
+│  ...                                                   │
+│                                                        │
+│  [06 Text-Based Certifications Card - NO Images]       │
+│  - Verified Credential Badge                           │
+│  - Issuer, ID, Key Competencies                        │
+│  - Direct PDF Verification Actions                     │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Key Design & Structural Adjustments
+
+### A. Sticky Top Navigation Rail (Mobile Left-to-Top Repositioning)
+- **Top Pinned Header**: The navigation rail moves from the left column into a pinned top header bar on mobile (`top: max(4rem, calc(3.75rem + env(safe-area-inset-top)))`).
+- **Horizontal Scroll Snap Rail**: The 6 category pills (01 Bio, 02 Experience, 03 Tech Arsenal, 04 Education, 05 Milestones, 06 Certifications) are arranged horizontally in a swipeable rail with `scroll-snap-type: x proximity`.
+- **Dynamic Step Counter & Progress Indicator**: Displays the current step (e.g. `02 / 06 EXPERIENCE`) with a sleek gradient progress bar beneath the pills.
+
+### B. Sequential Automatic Scroll-Switching
+- **Real-Time ScrollSpy**: As the user scrolls down through the content cards, the top sticky rail highlights the active category and automatically centers the active pill in the horizontal rail.
+- **Direct Tap-to-Scroll**: Tapping any pill smoothly scrolls directly to that card with accurate offset calculation so content is never hidden behind the sticky header.
+- **Content Below**: All data and cards for each section appear directly below the sticky top rail in order (01 → 02 → 03 → 04 → 05 → 06) before smoothly transitioning into the subsequent portfolio sections.
+
+### C. Redesigned "Tech Arsenal" Subsection
+- **Organized Category Blocks**:
+  1. **Frontend Architecture** (JavaScript, TypeScript, React, Next.js, Redux, Tailwind CSS, GSAP, Framer Motion, Sass, Bootstrap)
+  2. **Backend & APIs** (Node.js, NestJS, Express.js)
+  3. **Database & ORM** (MySQL, PostgreSQL, MongoDB, Prisma)
+  4. **DevOps & Developer Tools** (Git, GitHub, Docker, Vite, AWS)
+- **Interactive Mobile Pills & Level Tags**:
+  - Each technology gets an icon badge, clear typography, and contextual role badge (e.g. `Core`, `Architecture`, `Animation`, `Relational`, `Cloud`).
+  - Improved touch targets (minimum 44px height) with subtle tactile feedback on tap.
+
+### D. Redesigned Text-Only Certification Display (No Images)
+- **Image Removal**: Completely removes the certificate snapshot image and overlay placeholder.
+- **High-Trust Text Credential Card**:
+  - **Header & Issuer**: `Complete Web Development Course` • Issued by **Programming Hero** (Batch 5).
+  - **Verified Badge**: `✓ Verified Credential • Top 15% Academic Rank`.
+  - **Metadata Row**: Credential ID `WEB5-1210` • Issue Date • Verification Status.
+  - **Curriculum & Validated Competencies**: Structured chip grid of assessed topics (Full-Stack Architecture, React Ecosystem, Node APIs, Database Design, Responsive UX).
+  - **Action Buttons**: High-contrast text buttons for `View Official PDF ↗` and `Download PDF ↓`.
+
+---
+
+## 3. Proposed Changes
+
+### Component 1: Markup (`index.html`)
+
+#### [MODIFY] [index.html](file:///e:/Websites/The_Portfolio/index.html)
+- Update `#profile-skills` (Tech Arsenal) card to incorporate structured category cards with capability tags and clean semantic markup.
+- Update `#profile-certifications` card to remove `<img>` viewer and replace with a pure text credential layout with metadata and verified badge.
+
+---
+
+### Component 2: Styles (`style.css`)
+
+#### [MODIFY] [style.css](file:///e:/Websites/The_Portfolio/style.css)
+- Refine `.profile-rail__sticky` mobile styling with safe-area insets, backdrop blur, step counter, and horizontal pill rail.
+- Add new styles for `.tech-arsenal-card`, `.tech-category-group`, `.tech-chip`, and `.tech-chip__role`.
+- Add new text-only credential styles for `.cert-credential-card`, `.cert-header`, `.cert-meta-grid`, `.cert-badge`, and `.cert-competencies`.
+- Ensure desktop/tablet dual-column layout is 100% preserved.
+
+---
+
+### Component 3: Interaction & Scroll Logic (`script.js`)
+
+#### [MODIFY] [script.js](file:///e:/Websites/The_Portfolio/script.js)
+- Enhance `selectProfileCard()` and scroll listener to update the mobile step counter (e.g., `01 / 06`, `02 / 06`) and auto-center the active pill.
+- Ensure proper scroll offset calculation for mobile sticky headers.
+
+---
+
+## 4. Verification Plan
+
+### Automated / Syntax Verification
+- Check HTML and CSS validity and ensure no console errors during runtime.
+
+### Manual & Visual Verification
+- **Mobile Viewports (375px, 390px, 414px)**:
+  - Test scrolling from 01 Bio through 06 Certifications.
+  - Confirm the left rail is pinned to top and smoothly switches sequential items (01 → 02 → ... → 06).
+  - Confirm Tech Arsenal cards are readable, structured, and touch-interactive.
+  - Confirm Certifications card contains zero images and presents clear text credentials with functional PDF links.
+- **Desktop / Tablet Viewports (768px, 1024px, 1440px)**:
+  - Confirm the dual-column desktop/tablet dossier experience is completely intact.

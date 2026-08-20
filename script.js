@@ -1492,7 +1492,12 @@ function selectSkill(skillId, options = {}) {
   appState.activeSkillId = skill.id;
   if (manual) appState.skillSelectionManual = true;
   renderActiveSkill(skill, { animate, announce });
-  if (focus) skillRuntime.buttons.find((button) => button.dataset.skillId === skill.id)?.focus();
+  const activeBtn = skillRuntime.buttons.find((button) => button.dataset.skillId === skill.id);
+  if (focus) activeBtn?.focus();
+  if (activeBtn && window.matchMedia("(max-width: 47.99rem)").matches && typeof skillRuntime.path?.scrollTo === "function") {
+    const left = activeBtn.offsetLeft - ((skillRuntime.path.clientWidth - activeBtn.offsetWidth) / 2);
+    skillRuntime.path.scrollTo({ left: Math.max(0, left), behavior: appState.reducedMotion ? "auto" : "smooth" });
+  }
 }
 
 function syncSkillWithPortfolioMode(mode = appState.mode) {
@@ -2411,6 +2416,204 @@ function scrollToTop() {
   announceInteraction("Returned to the top of the portfolio.");
 }
 
+let profileDossierRuntime = null;
+
+function selectProfileCard(targetSelector, options = {}) {
+  if (!profileDossierRuntime) return;
+  const { announce = false, scroll = false, focus = false } = options;
+  const targetCard = profileDossierRuntime.cards.find((c) => `#${c.id}` === targetSelector || c.id === targetSelector.replace("#", ""));
+  if (!targetCard) return;
+
+  const targetId = `#${targetCard.id}`;
+
+  // Update Navigation Tab States
+  profileDossierRuntime.navButtons.forEach((btn) => {
+    const isSelected = btn.dataset.profileTarget === targetId;
+    btn.classList.toggle("is-active", isSelected);
+    btn.setAttribute("aria-selected", String(isSelected));
+    btn.tabIndex = isSelected ? 0 : -1;
+    if (isSelected && focus) {
+      btn.focus({ preventScroll: true });
+    }
+  });
+
+  // Update Card States
+  profileDossierRuntime.cards.forEach((card) => {
+    const isCurrent = card === targetCard;
+    card.classList.toggle("is-active", isCurrent);
+  });
+
+  const activeBtn = profileDossierRuntime.navButtons.find((btn) => btn.dataset.profileTarget === targetId);
+  const currentIndex = profileDossierRuntime.cards.indexOf(targetCard);
+  if (currentIndex >= 0) {
+    profileDossierRuntime.mobileStep.textContent = `${String(currentIndex + 1).padStart(2, "0")} / ${String(profileDossierRuntime.cards.length).padStart(2, "0")}`;
+    profileDossierRuntime.mobileLabel.textContent = activeBtn?.querySelector(".profile-nav__title")?.textContent || "";
+  }
+
+  // Auto-scroll horizontal pill rail on mobile
+  if (activeBtn && window.innerWidth <= 767) {
+    const parentList = activeBtn.closest(".profile-nav__list");
+    if (parentList) {
+      const btnLeft = activeBtn.offsetLeft;
+      const btnWidth = activeBtn.offsetWidth;
+      const listWidth = parentList.clientWidth;
+      parentList.scrollTo({
+        left: btnLeft - (listWidth / 2) + (btnWidth / 2),
+        behavior: appState.reducedMotion ? "auto" : "smooth",
+      });
+    }
+  }
+
+  // Smooth scroll to card
+  if (scroll) {
+    if (revealRuntime?.lenis && !appState.reducedMotion) {
+      const headerOffset = window.innerWidth <= 767 ? -120 : -90;
+      revealRuntime.lenis.scrollTo(targetCard, {
+        offset: headerOffset,
+        duration: 1.1,
+      });
+    } else {
+      const headerOffset = window.innerWidth <= 767 ? 120 : 90;
+      const targetPos = targetCard.getBoundingClientRect().top + window.scrollY - headerOffset;
+      window.scrollTo({
+        top: targetPos,
+        behavior: appState.reducedMotion ? "auto" : "smooth",
+      });
+    }
+  }
+
+  if (announce) {
+    const title = targetCard.querySelector(".profile-card__title")?.textContent || targetCard.id;
+    announceInteraction(`Viewing Profile category: ${title}`);
+  }
+}
+
+function updateProfileProgress() {
+  if (!profileDossierRuntime?.progressBar || !profileDossierRuntime?.section) return;
+  const rect = profileDossierRuntime.section.getBoundingClientRect();
+  const total = rect.height - window.innerHeight;
+  if (total <= 0) return;
+  const current = -rect.top;
+  const progressPercent = Math.min(100, Math.max(0, (current / total) * 100));
+  profileDossierRuntime.progressBar.style.setProperty("--profile-progress", `${progressPercent.toFixed(1)}%`);
+}
+
+function initProfileDossier() {
+  const section = document.querySelector(".profile-dossier");
+  if (!section) return;
+
+  const navButtons = Array.from(section.querySelectorAll(".profile-nav__item"));
+  const cards = Array.from(section.querySelectorAll(".profile-card"));
+  const progressBar = section.querySelector("[data-profile-progress]");
+  const profileNav = section.querySelector(".profile-nav");
+  const navList = section.querySelector(".profile-nav__list");
+  const mobileStep = section.querySelector("[data-profile-mobile-step]");
+  const mobileLabel = section.querySelector("[data-profile-mobile-label]");
+
+  if (!navButtons.length || !cards.length || !mobileStep || !mobileLabel) return;
+
+  profileDossierRuntime = {
+    section,
+    navButtons,
+    cards,
+    progressBar,
+    navList,
+    mobileStep,
+    mobileLabel,
+    triggers: [],
+  };
+
+  const mobileProfileQuery = window.matchMedia("(max-width: 47.99rem)");
+  const syncProfileOrientation = () => profileNav?.setAttribute("aria-orientation", mobileProfileQuery.matches ? "horizontal" : "vertical");
+  syncProfileOrientation();
+  mobileProfileQuery.addEventListener?.("change", syncProfileOrientation);
+
+  // Click handling
+  navButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      selectProfileCard(btn.dataset.profileTarget, { scroll: true, announce: true });
+    });
+  });
+
+  // Keyboard navigation
+  navList?.addEventListener("keydown", (event) => {
+    const currentIndex = navButtons.indexOf(document.activeElement);
+    if (currentIndex < 0) return;
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % navButtons.length;
+    } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + navButtons.length) % navButtons.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = navButtons.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    const nextBtn = navButtons[nextIndex];
+    selectProfileCard(nextBtn.dataset.profileTarget, { scroll: true, focus: true, announce: true });
+  });
+
+  // GSAP ScrollTrigger Integration
+  if (window.ScrollTrigger && !appState.reducedMotion) {
+    cards.forEach((card, index) => {
+      const isFirst = index === 0;
+      const isLast = index === cards.length - 1;
+      const trigger = ScrollTrigger.create({
+        trigger: card,
+        start: isFirst ? "top 80%" : "top 50%",
+        end: isLast ? "bottom 20%" : "bottom 50%",
+        onEnter: () => selectProfileCard(`#${card.id}`, { scroll: false }),
+        onEnterBack: () => selectProfileCard(`#${card.id}`, { scroll: false }),
+        onToggle: (self) => {
+          if (self.isActive) selectProfileCard(`#${card.id}`, { scroll: false });
+        },
+      });
+      profileDossierRuntime.triggers.push(trigger);
+    });
+
+    const progressTrigger = ScrollTrigger.create({
+      trigger: section,
+      start: "top 70%",
+      end: "bottom 30%",
+      scrub: true,
+      onUpdate: (self) => {
+        if (progressBar) {
+          progressBar.style.setProperty("--profile-progress", `${(self.progress * 100).toFixed(1)}%`);
+        }
+      },
+    });
+    profileDossierRuntime.triggers.push(progressTrigger);
+  } else {
+    // Native scroll listener fallback
+    window.addEventListener("scroll", () => {
+      updateProfileProgress();
+      const threshold = window.innerHeight * 0.45;
+      let activeCard = cards[0];
+      let minDistance = Infinity;
+
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        if (rect.top <= threshold && rect.bottom >= threshold) {
+          activeCard = card;
+        } else {
+          const distance = Math.abs(rect.top - threshold);
+          if (distance < minDistance) {
+            minDistance = distance;
+            activeCard = card;
+          }
+        }
+      });
+
+      if (activeCard) {
+        selectProfileCard(`#${activeCard.id}`, { scroll: false });
+      }
+    }, { passive: true });
+  }
+}
+
 function initBackToTop() {
   document.querySelector("[data-back-to-top]")?.addEventListener("click", scrollToTop);
 }
@@ -2435,6 +2638,7 @@ function initApp() {
     ["Local time", initLocalTime],
     ["Hero explore mode", initExploreMode],
     ["Portfolio mode", initDeveloperModeToggle],
+    ["Profile dossier", initProfileDossier],
     ["Project cards", initProjectCards],
     ["Project filters", initProjectFilters],
     ["Skill selector", initSkillSelector],
