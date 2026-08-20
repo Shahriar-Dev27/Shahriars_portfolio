@@ -35,6 +35,8 @@ This is the personal portfolio of **Shahriar Islam Dip** — a Computer Science 
 | **Process Navigator** | 7-stage interactive timeline: Discover → Define → Design → Engineer → Test → Launch → Improve |
 | **Skills Tab System** | Five expertise areas with dynamic content: Creative Frontend, UI Engineering, Full-Stack, Performance, Integrations |
 | **Statement Orbital** | Circular text animation with scroll-linked portrait reveal |
+| **Profile & Career Dossier** | 6-section interactive dossier (Bio, Experience, Tech Arsenal, Education, Milestones, Certifications) with sticky navigation rail and scroll-spy |
+| **Mobile-First Responsive** | Redesigned mobile experience with horizontal scroll-snap rail, sequential scroll-switching, and text-first certification display |
 | **Full Accessibility** | Semantic HTML, ARIA attributes, keyboard navigation, focus management, reduced-motion support, skip links |
 | **No-JS Fallbacks** | All critical content readable without JavaScript via `<noscript>` blocks |
 | **Custom Cursor** | Context-aware cursor with labeled states (OPEN, EXPLORE, SCROLL, REVEAL, FILTER, STEP, CONTACT, CLOSE, PREV, NEXT, TOP, COPY, CONNECT, MENU) |
@@ -98,6 +100,59 @@ npx serve .
 php -S localhost:8080
 ```
 Then open `http://localhost:8080` in your browser.
+
+---
+
+## 📱 Mobile Experience Highlights
+
+The portfolio includes a **comprehensive mobile redesign** for the Profile & Career Dossier section:
+
+- **Sticky Top Navigation Rail** — Horizontal scroll-snap pill rail with 6 categories (Bio, Experience, Tech Arsenal, Education, Milestones, Certifications)
+- **Sequential Scroll-Switching** — Real-time ScrollSpy highlights active category, auto-centers active pill, tap-to-scroll navigation
+- **Redesigned Tech Arsenal** — Organized into 4 category blocks (Frontend Architecture, Backend & APIs, Database & ORM, DevOps & Tools) with interactive chips, icons, and role badges
+- **Text-First Certifications** — Pure text credential cards with verified badges, metadata, competency chips, and direct PDF verification actions (no images)
+
+---
+
+## 🎨 Design System
+
+- **Typography**: Inter (UI), Space Grotesk (Display), Space Mono (Code)
+- **Color Tokens**: CSS custom properties for light/dark themes
+- **Spacing Scale**: Consistent 4px base unit
+- **Border Radius**: 4px, 8px, 12px, 16px, full
+- **Shadows**: Layered elevation system
+- **Motion**: Respects `prefers-reduced-motion`, GSAP for complex animations
+
+---
+
+## ♿ Accessibility
+
+- Semantic HTML5 landmarks (`header`, `nav`, `main`, `section`, `aside`, `footer`)
+- ARIA labels, roles, and live regions for dynamic content
+- Full keyboard navigation with visible focus states
+- Focus trapping in modal dialogs
+- Skip-to-content link
+- Reduced motion support via `prefers-reduced-motion`
+- Sufficient color contrast (WCAG 2.1 AA)
+- Screen reader optimized content structure
+
+---
+
+## 📄 License
+
+This portfolio is open source for learning and inspiration. Feel free to explore the code, but please do not copy the design or content directly for your own portfolio without attribution.
+
+---
+
+## 🤝 Connect
+
+- **GitHub**: [@ShahriarDip](https://github.com/ShahriarDip)
+- **LinkedIn**: [Shahriar Islam Dip](https://linkedin.com/in/shahriar-islam-dip)
+- **Email**: shahriar.dip@example.com
+
+---
+
+*Built with care, curiosity, and a lot of coffee ☕*
 
 ### Requirements
 - Modern browser with ES6+ and WebGL support
