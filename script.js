@@ -1,13 +1,41 @@
 "use strict";
 
 const DEVELOPER_TIME_ZONE = "Asia/Dhaka";
-const LOADER_SESSION_KEY = "portfolio-loader-seen";
+const LOADER_SESSION_KEY = "portfolio-loader-seen"; // keep in sync with inline <head> script in index.html
+const LOADER_MIN_DISPLAY_MS = 1000; // performance.now() timebase (since navigation start)
+const LOADER_MIN_COUNT_MS = 600; // minimum count-up duration from initLoader start
+const LOADER_SAFETY_TIMEOUT_MS = 4000; // from initLoader start: force target to 100%
+const LOADER_HARD_TIMEOUT_MS = 5500; // from initLoader start: call finish() directly even if rAF is paused
+const LOADER_LEAVE_FALLBACK_MS = 960; // exit cleanup fallback if transitionend never fires
 const MODE_STORAGE_KEY = "portfolio-preferred-mode";
 const PROJECT_FILTER_SESSION_KEY = "portfolio-project-filter";
 const MAX_CANVAS_DPR = 2;
 
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
-window.addEventListener("pageshow", () => window.scrollTo({ top: 0, left: 0, behavior: "instant" }), { once: true });
+let initialPagePositionPending = false;
+
+function restoreInitialPagePosition() {
+  if (!initialPagePositionPending || !appState.loaderComplete) return;
+  initialPagePositionPending = false;
+  const hash = window.location.hash.slice(1);
+  if (!hash) {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    return;
+  }
+  let targetId = hash;
+  try {
+    targetId = decodeURIComponent(hash);
+  } catch (error) {
+    // A malformed fragment must not prevent the rest of the page from working.
+  }
+  document.getElementById(targetId)?.scrollIntoView({ behavior: "instant", block: "start" });
+}
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) return;
+  initialPagePositionPending = true;
+  restoreInitialPagePosition();
+}, { once: true });
 
 const portfolioModes = {
   design: {
@@ -187,6 +215,37 @@ const projectData = [
       result: "An expressive storefront concept that balances visual experimentation with an understandable shopping path.",
     },
   },
+  {
+    id: "a-day-in-dhaka",
+    number: "04",
+    title: "A Day in Dhaka",
+    category: "frontend",
+    type: "Illustrated Scroll Storyboard",
+    year: "2026",
+    role: "Illustration / Frontend Development",
+    status: "View project",
+    caseType: "Self-directed frontend storyboard",
+    summary: "A Bangla-led illustrated story following Mama's Tong and its neighbourhood through an ordinary day in Dhaka, from the first cup of chai to the closing phone call.",
+    outcome: "Nine scroll-driven scenes combine original illustration, bilingual captions, and optional city ambience and Bangla voices.",
+    image: "images/projects/A-Day-in-Dhaka.png",
+    imageWidth: 1920,
+    imageHeight: 945,
+    imageAlt: "A Day in Dhaka morning traffic scene with colourful rickshaws, buses, Bangla shop signs, and a metro train on the elevated tracks",
+    liveUrl: "https://a-day-in-dhaka-city.dipshahriarislam.workers.dev/",
+    repositoryUrl: "https://github.com/Shahriar-Dev27/A-day-In-Dhaka-City-",
+    technologies: ["Next.js", "React", "TypeScript", "Tailwind CSS", "GSAP / ScrollTrigger", "Lenis", "SVG", "Canvas 2D", "WebGL", "Web Audio"],
+    designTechnologies: ["SVG Illustration", "GSAP / ScrollTrigger", "Bilingual Storytelling"],
+    developTechnologies: ["Next.js", "React", "TypeScript", "Canvas 2D", "WebGL"],
+    theme: "dark",
+    layout: "wide",
+    details: {
+      overview: "A frontend-only illustrated storyboard titled A Day in Dhaka: Mama's Tong. Nine scenes follow a neighbourhood chai stall and the people around it from before dawn to 11:45 PM, with Bangla as the main voice and small English subtitles.",
+      challenge: "Tell an ordinary Dhaka working day from one fixed street corner while making changes in light, palette, and pace carry the narrative. The stall, its regulars, an unpaid-tabs notebook, and a hanging bulb provide continuity across the day.",
+      approach: "Create original inline SVG illustrations with flat fills, wobbled edges, halftone, and paper specks. Tie story motion to scroll position so visitors can move the day forwards or backwards, with optional synthesized city ambience and Bangla voice playback.",
+      implementation: "Built with Next.js App Router, React, strict TypeScript, and Tailwind CSS. GSAP ScrollTrigger drives scrubbed scene timelines, Lenis smooths scrolling, Canvas 2D animates pigeons, and plain WebGL renders light trails. Reduced-motion preferences show static compositions; lower device tiers simplify effects. Audio is opt-in and stops when the tab is hidden.",
+      result: "An original interactive frontend story spanning dawn chai, morning tabs, traffic, metro travel, noon heat, rooftop life, evening adda, and a closing phone call. Native-speaker review, some metro details, and real-device mobile performance testing remain pending in the project README.",
+    },
+  },
 ];
 
 const processData = [
@@ -258,7 +317,10 @@ function syncScrollLock() {
       overflow: document.body.style.overflow,
       paddingRight: document.body.style.paddingRight,
     };
-    const scrollbarGap = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+    // While the loader is pending, html reserves the gutter (scrollbar-gutter: stable), so no extra padding is needed.
+    const scrollbarGap = document.documentElement.classList.contains("loader-pending")
+      ? 0
+      : Math.max(0, window.innerWidth - document.documentElement.clientWidth);
     const bodyPaddingRight = Number.parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
     document.body.style.position = "fixed";
     document.body.style.top = `-${lockedScrollY}px`;
@@ -280,7 +342,7 @@ function syncScrollLock() {
     document.body.style.width = styles.width;
     document.body.style.overflow = styles.overflow;
     document.body.style.paddingRight = styles.paddingRight;
-    window.scrollTo(0, lockedScrollY);
+    window.scrollTo({ top: lockedScrollY, left: 0, behavior: "instant" });
     revealRuntime?.lenis?.start();
     window.ScrollTrigger?.refresh();
   }
@@ -312,11 +374,11 @@ function syncBodyInteractionState() {
   document.documentElement.classList.toggle("reduced-motion", appState.reducedMotion);
 }
 
-function startHeroEntrance() {
+function startHeroEntrance({ immediate = false } = {}) {
   const hero = document.querySelector("#home");
   if (!hero) return;
 
-  if (appState.reducedMotion) {
+  if (immediate || appState.reducedMotion) {
     hero.classList.add("is-entered");
     document.body.classList.add("hero-entered");
     return;
@@ -333,106 +395,226 @@ function startHeroEntrance() {
   });
 }
 
+// Every promise resolves and never rejects, so a failed signal can never stall the loader.
+function getLoaderReadinessSignals() {
+  const noop = () => {};
+  const heroImage = document.querySelector(".hero__portrait-image--bw");
+
+  return [
+    { id: "scripts", weight: 0.15, promise: Promise.resolve() },
+    {
+      id: "fonts",
+      weight: 0.3,
+      promise: document.fonts ? document.fonts.ready.then(noop, noop) : Promise.resolve(),
+    },
+    {
+      id: "hero-image",
+      weight: 0.3,
+      promise: heroImage && typeof heroImage.decode === "function"
+        ? heroImage.decode().then(noop, noop)
+        : Promise.resolve(),
+    },
+    {
+      id: "window-load",
+      weight: 0.25,
+      promise: document.readyState === "complete"
+        ? Promise.resolve()
+        : new Promise((resolve) => window.addEventListener("load", resolve, { once: true })),
+    },
+  ];
+}
+
+function nextLoaderDisplayValue(current, target, deltaMs, tauMs = 160) {
+  return current + (target - current) * (1 - Math.exp(-deltaMs / tauMs));
+}
+
+function getLoaderMessage(percentage) {
+  if (percentage < 30) return "Loading typography";
+  if (percentage < 65) return "Preparing visuals";
+  if (percentage < 95) return "Enabling interactions";
+  return "Ready";
+}
+
 function initLoader() {
   const loader = document.querySelector("#loading-screen");
   const progress = loader?.querySelector("[data-loader-progress]");
   const message = loader?.querySelector("[data-loader-message]");
+  const meter = loader?.querySelector("[data-loader-meter]");
+  const line = loader?.querySelector("[data-loader-line]");
   const skipButton = loader?.querySelector("[data-loader-skip]");
-  if (!loader || !progress || !message || !skipButton) {
-    startHeroEntrance();
+  const root = document.documentElement;
+  if (!loader || !progress || !message || !meter || !line || !skipButton) {
+    root.classList.remove("loader-pending");
+    appState.loaderComplete = true;
+    startHeroEntrance({ immediate: root.classList.contains("loader-dismissed") });
     return;
   }
 
-  const pageRegions = document.querySelectorAll("header, main, footer");
+  const pageRegions = document.querySelectorAll(".skip-link, header, main, footer");
   const setPageInert = (inert) => pageRegions.forEach((region) => { region.inert = inert; });
 
-  let wasSeen = false;
-  try {
-    wasSeen = sessionStorage.getItem(LOADER_SESSION_KEY) === "true";
-  } catch (error) {
-    console.warn("Portfolio loader session state is unavailable.", error);
-  }
-
-  if (appState.reducedMotion || wasSeen) {
+  if (!root.classList.contains("loader-pending") || appState.reducedMotion) {
+    root.classList.remove("loader-pending");
     loader.hidden = true;
     appState.loaderComplete = true;
-    startHeroEntrance();
+    startHeroEntrance({ immediate: root.classList.contains("loader-dismissed") });
     return;
   }
 
-  try {
-    sessionStorage.setItem(LOADER_SESSION_KEY, "true");
-  } catch (error) {
-    console.warn("Portfolio loader session state could not be saved.", error);
-  }
-
-  const messages = [
-    { at: 0, text: "Loading interface" },
-    { at: 0.34, text: "Compiling motion" },
-    { at: 0.68, text: "Connecting experience" },
-    { at: 0.93, text: "Load Shahriar Islam Dip" },
-  ];
-  const duration = 1250;
+  const rightPanel = loader.querySelector(".loader__panel--right");
   let animationFrame = 0;
-  let startTime = 0;
+  let safetyTimer = 0;
+  let hardTimer = 0;
+  let leaveTimer = 0;
   let finished = false;
+  let cleanedUp = false;
 
-  function cleanup() {
+  function stopListening() {
     cancelAnimationFrame(animationFrame);
     document.removeEventListener("keydown", handleKeydown);
     skipButton.removeEventListener("click", finish);
   }
 
+  function clearLoaderTimers() {
+    window.clearTimeout(safetyTimer);
+    window.clearTimeout(hardTimer);
+  }
+
+  function cleanup() {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    window.clearTimeout(leaveTimer);
+    rightPanel?.removeEventListener("transitionend", handleLeaveEnd);
+    const focusWasInLoader = loader.contains(document.activeElement);
+    loader.hidden = true;
+    root.classList.remove("loader-pending", "loader-running");
+    document.body.classList.remove("loader-active");
+    setPageInert(false);
+    unlockPageScroll("loader");
+    appState.loaderComplete = true;
+    restoreInitialPagePosition();
+    if (focusWasInLoader) document.querySelector("#hero-title")?.focus({ preventScroll: true });
+    // Announced only once the aria-modal dialog is gone, so screen readers do not swallow it.
+    announceInteraction("Portfolio loaded");
+  }
+
+  function handleLeaveEnd(event) {
+    if (event.target === rightPanel && event.propertyName === "transform") cleanup();
+  }
+
+  // Idempotent: shared by natural completion, Skip, Escape and the hard timeout.
   function finish() {
     if (finished) return;
     finished = true;
-    cleanup();
-    progress.value = 100;
-    progress.textContent = "100%";
-    message.textContent = "Load Shahriar Islam Dip";
-    loader.classList.add("is-leaving");
-    appState.loaderComplete = true;
-    startHeroEntrance();
+    // Arm the exit cleanup first: nothing below may leave the page locked if it throws.
+    rightPanel?.addEventListener("transitionend", handleLeaveEnd);
+    leaveTimer = window.setTimeout(cleanup, LOADER_LEAVE_FALLBACK_MS);
+    stopListening();
+    clearLoaderTimers();
 
-    window.setTimeout(() => {
-      loader.hidden = true;
-      document.body.classList.remove("loader-active");
-      unlockPageScroll("loader");
-      setPageInert(false);
-      if (loader.contains(document.activeElement)) document.querySelector("#hero-title")?.focus();
-    }, 640);
+    try {
+      progress.textContent = "100%";
+      line.style.transform = "scaleX(1)";
+      meter.setAttribute("aria-valuenow", "100");
+      message.textContent = getLoaderMessage(100);
+      loader.classList.add("is-leaving");
+      appState.loaderComplete = true;
+      startHeroEntrance();
+    } catch (error) {
+      console.error("Portfolio loader exit failed; cleanup is still scheduled.", error);
+    }
   }
 
   function handleKeydown(event) {
     if (event.key === "Escape") finish();
   }
 
-  function update(timestamp) {
-    if (!startTime) startTime = timestamp;
-    const ratio = Math.min((timestamp - startTime) / duration, 1);
-    const eased = 1 - Math.pow(1 - ratio, 3);
-    const percentage = Math.min(100, Math.round(eased * 100));
-    const activeMessage = [...messages].reverse().find((item) => ratio >= item.at);
+  function startProgress() {
+    const initStart = performance.now();
+    const minEndAt = Math.max(LOADER_MIN_DISPLAY_MS, initStart + LOADER_MIN_COUNT_MS);
+    const signals = getLoaderReadinessSignals();
+    let realRatio = 0;
+    let timedOut = false;
+    let displayed = 0;
+    let lastFrame = initStart;
+    let lastShown = 0;
+    let lastDecade = 0;
+    let lastMessage = message.textContent;
+    let doneCount = 0;
 
-    progress.value = percentage;
-    progress.textContent = `${percentage}%`;
-    message.textContent = activeMessage?.text ?? messages[0].text;
+    signals.forEach((signal) => {
+      signal.promise.then(() => {
+        doneCount += 1;
+        // Snap to exactly 1 when every signal is done so float drift cannot stall completion.
+        realRatio = doneCount === signals.length ? 1 : Math.min(1, realRatio + signal.weight);
+      });
+    });
 
-    if (ratio < 1) {
-      animationFrame = requestAnimationFrame(update);
-    } else {
-      finish();
+    // Arm both timers before the first frame so a throwing tick can never leave the loader stuck.
+    safetyTimer = window.setTimeout(() => { timedOut = true; }, LOADER_SAFETY_TIMEOUT_MS);
+    hardTimer = window.setTimeout(finish, LOADER_HARD_TIMEOUT_MS);
+
+    function tick(now) {
+      if (finished) return;
+      try {
+        const dt = Math.max(0, Math.min(64, now - lastFrame));
+        const elapsed = Math.max(0, now - initStart);
+        lastFrame = now;
+
+        const creep = 1 - Math.exp(-elapsed / 1500);
+        const signalTarget = timedOut ? 1 : Math.max(realRatio, Math.min(realRatio + 0.15, creep));
+        const timeCap = Math.min(1, elapsed / Math.max(1, minEndAt - initStart));
+        const target = Math.min(signalTarget, timeCap) * 100;
+        displayed = nextLoaderDisplayValue(displayed, target, dt);
+
+        const shown = Math.floor(displayed);
+        if (shown !== lastShown) {
+          lastShown = shown;
+          progress.textContent = `${shown}%`;
+        }
+        line.style.transform = `scaleX(${(displayed / 100).toFixed(4)})`;
+
+        const decade = Math.floor(shown / 10) * 10;
+        if (decade !== lastDecade) {
+          lastDecade = decade;
+          meter.setAttribute("aria-valuenow", String(decade));
+        }
+
+        const nextMessage = getLoaderMessage(shown);
+        if (nextMessage !== lastMessage) {
+          lastMessage = nextMessage;
+          message.textContent = nextMessage;
+        }
+
+        if (target === 100 && displayed >= 99.5) finish();
+        else animationFrame = requestAnimationFrame(tick);
+      } catch (error) {
+        console.error("Portfolio loader progress failed; finishing.", error);
+        finish();
+      }
     }
+
+    animationFrame = requestAnimationFrame(tick);
   }
 
-  loader.hidden = false;
-  document.body.classList.add("loader-active");
-  lockPageScroll("loader");
-  setPageInert(true);
-  skipButton.addEventListener("click", finish);
-  document.addEventListener("keydown", handleKeydown);
-  skipButton.focus();
-  animationFrame = requestAnimationFrame(update);
+  root.classList.add("loader-running");
+  try {
+    document.body.classList.add("loader-active");
+    lockPageScroll("loader");
+    setPageInert(true);
+    skipButton.addEventListener("click", finish);
+    document.addEventListener("keydown", handleKeydown);
+    skipButton.focus({ preventScroll: true });
+    startProgress();
+  } catch (error) {
+    console.error("Portfolio loader failed; releasing the page.", error);
+    finished = true;
+    stopListening();
+    clearLoaderTimers();
+    cleanup();
+    appState.loaderComplete = true;
+    startHeroEntrance({ immediate: true });
+  }
 }
 
 function initNavigation() {
@@ -470,7 +652,9 @@ function initNavigation() {
     });
   }, { rootMargin: "-28% 0px -58%", threshold: [0, 0.1, 0.35, 0.6] });
   observedSections.forEach((section) => observer.observe(section));
-  window.addEventListener("pagehide", () => observer.disconnect(), { once: true });
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) observer.disconnect();
+  });
 }
 
 function initMobileMenu() {
@@ -510,7 +694,7 @@ function initMobileMenu() {
     }
 
     if (event.key !== "Tab") return;
-    const focusable = [...menu.querySelectorAll(focusableSelector), menuButton];
+    const focusable = [menuButton, ...menu.querySelectorAll(focusableSelector)];
     const first = focusable[0];
     const last = focusable.at(-1);
     if (!first || !last) return;
@@ -894,13 +1078,16 @@ function initHeroBrushReveal() {
   if ("IntersectionObserver" in window) {
     const observer = new IntersectionObserver(([entry]) => setHeroVisibility(entry.isIntersecting), { threshold: 0.05 });
     observer.observe(element.closest("#home") ?? element);
-    window.addEventListener("pagehide", () => observer.disconnect(), { once: true });
+    window.addEventListener("pagehide", (event) => {
+      if (!event.persisted) observer.disconnect();
+    });
   }
 
-  window.addEventListener("pagehide", () => {
+  window.addEventListener("pagehide", (event) => {
+    if (event.persisted) return;
     window.removeEventListener("resize", handleResize);
     if (revealState?.animationFrame) cancelAnimationFrame(revealState.animationFrame);
-  }, { once: true });
+  });
 }
 
 function initLocalTime() {
@@ -1649,6 +1836,8 @@ function filterProjectCards(options = {}) {
     });
     projectRuntime.grid.style.removeProperty("min-height");
     projectRuntime.grid.removeAttribute("aria-busy");
+    // Filtering changes row positions; keep scroll reveals aligned with the visible grid.
+    window.ScrollTrigger?.refresh();
   };
   if (shouldUpdateImmediately) finish();
   else projectRuntime.filterTimer = window.setTimeout(finish, 240);
@@ -2139,7 +2328,9 @@ function initScrollReveals() {
     if (!image.complete) image.addEventListener("load", refresh, { once: true });
   });
   requestAnimationFrame(refresh);
-  window.addEventListener("pagehide", () => destroyScrollMotion({ showContent: false }), { once: true });
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) destroyScrollMotion({ showContent: false });
+  });
 }
 
 function handlePhaseFourMotionChange(reduced) {
@@ -2352,7 +2543,9 @@ function initCircularText() {
     statementRuntime.observer = new IntersectionObserver(([entry]) => setCircularStatementVisibility(Boolean(entry?.isIntersecting)), { threshold: 0.1 });
     statementRuntime.observer.observe(root);
   } else setCircularStatementVisibility(true);
-  window.addEventListener("pagehide", () => statementRuntime?.observer?.disconnect(), { once: true });
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) statementRuntime?.observer?.disconnect();
+  });
 }
 
 async function copyEmailAddress(email) {

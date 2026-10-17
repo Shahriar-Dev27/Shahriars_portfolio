@@ -235,7 +235,9 @@ const LIQUID_CONFIG = Object.freeze({
   window.addEventListener("scroll", handleScroll, { passive: true });
   document.addEventListener("visibilitychange", handleVisibility);
   motionPreference.addEventListener?.("change", handleMotionPreference);
-  window.addEventListener("pagehide", destroy, { once: true });
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) destroy();
+  });
 
   container?.classList.add("is-webgl");
   container?.classList.toggle("is-static", reducedMotion);

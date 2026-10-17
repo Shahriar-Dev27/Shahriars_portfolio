@@ -13,6 +13,8 @@ The interface intentionally shows designed filename placeholders when any listed
 - `projects/CareCompass.png` — CareCompass case study image.
 - `projects/gocart.png` — gocart case study image.
 
+- projects/A-Day-in-Dhaka.png — user-provided 1920×945 screenshot of the morning traffic scene in A Day in Dhaka: Mama's Tong. Source: https://github.com/Shahriar-Dev27/A-day-In-Dhaka-City-
+
 ### Preview
 - `screenshotPortfolio.png` — portfolio preview screenshot, embedded in the root README.
 

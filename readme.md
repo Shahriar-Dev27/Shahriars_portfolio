@@ -1,7 +1,7 @@
 # Shahriar Islam Dip — Creative Full-Stack Developer Portfolio
 
 > **Expressive design meets reliable engineering.**  
-> A production-ready, accessible, and motion-considered portfolio showcasing three self-directed digital products and a structured creative process.
+> A production-ready, accessible, and motion-considered portfolio showcasing four self-directed projects and a structured creative process.
 
 ---
 
@@ -31,7 +31,7 @@ This is the personal portfolio of **Shahriar Islam Dip** — a Computer Science 
 | **Interactive Hero** | Portrait reveal animation, mode selector, and two interaction modes: *Explore* (cursor-driven) and *Scroll* (traditional) |
 | **Liquid Background** | WebGL-powered organic background (`liquid-background.js`) — respects `prefers-reduced-motion` |
 | **Smooth Scroll** | Lenis-powered smooth scrolling with ScrollTrigger integration |
-| **Project Case Studies** | Three self-directed products with filterable grid, detailed dialogs, and keyboard navigation |
+| **Project Case Studies** | Four self-directed projects with filterable grid, detailed dialogs, and keyboard navigation |
 | **Process Navigator** | 7-stage interactive timeline: Discover → Define → Design → Engineer → Test → Launch → Improve |
 | **Skills Tab System** | Five expertise areas with dynamic content: Creative Frontend, UI Engineering, Full-Stack, Performance, Integrations |
 | **Statement Orbital** | Circular text animation with scroll-linked portrait reveal |
@@ -75,7 +75,10 @@ The_Portfolio/
 │   ├── socialpage.png              # Statement section portrait (1122×1402)
 │   ├── screenshotPortfolio.png     # Portfolio preview screenshot
 │   └── projects/
-│       └── BizStudio.png           # BizGuide AI case study image (1895×905)
+│       ├── BizStudio.png           # BizGuide AI case study image (1895×905)
+│       ├── CareCompass.png         # CareCompass case study image
+│       ├── gocart.png              # gocart case study image
+│       └── A-Day-in-Dhaka.png      # Storyboard traffic scene screenshot (1920×945)
 └── README.md               # This file
 ```
 
@@ -146,8 +149,8 @@ This portfolio is open source for learning and inspiration. Feel free to explore
 
 ## 🤝 Connect
 
-- **GitHub**: [@ShahriarDip](https://github.com/ShahriarDip)
-- **LinkedIn**: [Shahriar Islam Dip](https://linkedin.com/in/shahriar-islam-dip)
+- **GitHub**: [@Shahriar-Dev27](https://github.com/Shahriar-Dev27)
+- **LinkedIn**: [Shahriar Islam Dip](https://www.linkedin.com/in/shahriar-islam-536900229/)
 - **Email**: shahriar.dip@example.com
 
 ---
@@ -391,8 +394,8 @@ All project case studies, images, and written content are proprietary.
 | Channel | Link |
 |---------|------|
 | **Email** | [dipshahriar27@gmail.com](mailto:dipshahriar27@gmail.com) |
-| **GitHub** | [github.com/Eldorado10](https://github.com/Eldorado10?tab=repositories) |
-| **LinkedIn** | [linkedin.com/in/mr-eldorado-536900229](https://www.linkedin.com/in/mr-eldorado-536900229/) |
+| **GitHub** | [github.com/Shahriar-Dev27](https://github.com/Shahriar-Dev27) |
+| **LinkedIn** | [linkedin.com/in/shahriar-islam-536900229](https://www.linkedin.com/in/shahriar-islam-536900229/) |
 | **Portfolio** | [Live Site](#) *(deploy to get URL)* |
 
 > **Response time:** Typically within 30 minutes during business hours (GMT+6).  

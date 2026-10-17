@@ -60,6 +60,7 @@
   --hero-depth-y: 7px;
   --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-loader-wipe: cubic-bezier(0.76, 0, 0.24, 1);
   --z-base: 0;
   --z-background: 0;
   --z-page: 1;
@@ -115,6 +116,16 @@ body {
 body.loader-active,
 body.menu-open {
   overflow: hidden;
+}
+
+html.loader-pending,
+html.loader-pending body {
+  overflow: hidden;
+}
+
+html.loader-pending {
+  background-color: var(--color-black);
+  scrollbar-gutter: stable;
 }
 
 body.menu-open .site-header {
@@ -300,18 +311,23 @@ main,
   position: fixed;
   z-index: var(--z-loader);
   inset: 0;
-  display: grid;
+  display: none;
   place-items: center;
   overflow: hidden;
   color: var(--color-off-white);
 }
 
+html.loader-pending .loader {
+  display: grid;
+}
+
 .loader__panel {
   position: absolute;
   inset-block: 0;
-  width: 50%;
+  width: calc(50% + 1px);
   background: var(--color-black);
-  transition: transform 620ms var(--ease-standard);
+  will-change: transform;
+  transition: transform 760ms var(--ease-loader-wipe);
 }
 
 .loader__panel--left {
@@ -327,7 +343,7 @@ main,
   z-index: 1;
   width: min(34rem, calc(100% - 2rem));
   text-align: center;
-  transition: opacity 260ms var(--ease-exit), transform 400ms var(--ease-exit);
+  transition: opacity 240ms var(--ease-exit), transform 320ms var(--ease-exit);
 }
 
 .loader__label,
@@ -340,12 +356,20 @@ main,
 }
 
 .loader__label {
+  --loader-i: 0;
   color: var(--color-muted);
+}
+
+.loader__meter {
+  --loader-i: 1;
+  display: grid;
+  justify-items: center;
+  gap: clamp(1rem, 3vw, 1.75rem);
+  margin-block: clamp(1.5rem, 5vw, 3.5rem);
 }
 
 .loader__progress {
   display: block;
-  margin-block: clamp(1.5rem, 5vw, 3.5rem);
   font-family: var(--font-display);
   font-size: clamp(5rem, 17vw, 13rem);
   font-weight: 600;
@@ -354,12 +378,30 @@ main,
   font-variant-numeric: tabular-nums;
 }
 
+.loader__line {
+  display: block;
+  width: min(14rem, 50vw);
+  height: 1px;
+  overflow: hidden;
+  background: var(--color-border);
+}
+
+.loader__line-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
 .loader__message {
+  --loader-i: 2;
   min-height: 1.4em;
   color: var(--color-accent-steel);
 }
 
 .loader__skip {
+  --loader-i: 3;
   min-height: 2.75rem;
   margin-top: clamp(2rem, 6vw, 4rem);
   padding: 0.6rem 1rem;
@@ -374,6 +416,26 @@ main,
   color: var(--color-accent-hover);
 }
 
+@keyframes loader-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+html.loader-pending .loader__reveal {
+  animation: loader-reveal 640ms var(--ease-standard) both;
+  animation-delay: calc(var(--loader-i) * 90ms + 80ms);
+}
+
+.loader.is-leaving {
+  pointer-events: none;
+}
+
+.loader.is-leaving .loader__panel {
+  transition-delay: 120ms;
+}
+
 .loader.is-leaving .loader__panel--left {
   transform: translateX(-101%);
 }
@@ -384,7 +446,7 @@ main,
 
 .loader.is-leaving .loader__content {
   opacity: 0;
-  transform: scale(0.98);
+  transform: translateY(-0.75rem);
 }
 
 /* Header */
@@ -2930,6 +2992,21 @@ body[data-portfolio-mode="develop"] .skill-panel__eyebrow {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
+}
+
+/* Preserve the storyboard screenshot without cropping in both previews. */
+.project-card[data-project-id="a-day-in-dhaka"] .project-card__thumb img,
+.project-dialog[data-project-id="a-day-in-dhaka"] .project-dialog__media img {
+  object-fit: contain;
+}
+
+.project-card[data-project-id="a-day-in-dhaka"] .project-card__thumb,
+.project-dialog[data-project-id="a-day-in-dhaka"] .project-dialog__media {
+  background: #171d28;
+}
+
+.project-dialog[data-project-id="a-day-in-dhaka"] .project-dialog__media {
+  aspect-ratio: 1920 / 945;
 }
 
 /* Project dialog */
@@ -5755,6 +5832,10 @@ main>section {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .loader__reveal {
+    animation: none !important;
+  }
+
   .split-word {
     transform: none !important;
   }

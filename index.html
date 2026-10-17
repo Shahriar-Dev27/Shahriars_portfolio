@@ -5,15 +5,63 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090909">
+  <!-- keep in sync with LOADER_SESSION_KEY in script.js -->
+  <script>
+    (function () {
+      var root = document.documentElement;
+      try {
+        var reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+        var seen = false;
+        try {
+          seen = sessionStorage.getItem("portfolio-loader-seen") === "true";
+        } catch (e) {
+          seen = false;
+        }
+
+        if (!reduce && !seen) {
+          root.classList.add("loader-pending");
+          try {
+            sessionStorage.setItem("portfolio-loader-seen", "true");
+          } catch (e) { }
+
+          var release = function () {
+            if (!root.classList.contains("loader-pending") || root.classList.contains("loader-running")) return;
+            root.classList.remove("loader-pending");
+            root.classList.add("loader-dismissed");
+            document.removeEventListener("keydown", onKey);
+            document.removeEventListener("click", onClick);
+          };
+          var onKey = function (event) {
+            if (event.key === "Escape") release();
+          };
+          var onClick = function (event) {
+            if (event.target && event.target.closest && event.target.closest("[data-loader-skip]")) release();
+          };
+
+          setTimeout(release, 8000);
+          document.addEventListener("keydown", onKey);
+          document.addEventListener("click", onClick);
+        }
+      } catch (e) {
+        root.classList.remove("loader-pending");
+      }
+    })();
+  </script>
+  <style>
+    .loader {
+      display: none
+    }
+
+    html.loader-pending .loader {
+      display: grid
+    }
+  </style>
   <meta name="description"
     content="Portfolio of Shahriar Islam Dip, a creative full-stack developer building expressive digital products with reliable engineering.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Shahriar Islam Dip — Creative Full-Stack Developer">
   <meta property="og:description" content="Expressive design meets Reliable technology.">
-  <!-- <meta property="og:url" content="[CANONICAL URL]"> -->
-  <meta property="og:image" content="[SOCIAL PREVIEW IMAGE URL]">
-  <meta property="og:image:alt" content="[SOCIAL PREVIEW IMAGE DESCRIPTION]">
-  <link rel="canonical" href="[CANONICAL URL]">
+  <!-- Add absolute og:url, og:image, and canonical URLs when the deployment URL is known. -->
   <link rel="icon" type="image/png" sizes="32x32" href="favicon/SID.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,14 +93,18 @@
       enhancements require JavaScript.</p>
   </noscript>
 
-  <div class="loader" id="loading-screen" role="dialog" aria-modal="true" aria-labelledby="loader-title" hidden>
+  <div class="loader" id="loading-screen" role="dialog" aria-modal="true" aria-labelledby="loader-title">
     <div class="loader__panel loader__panel--left" aria-hidden="true"></div>
     <div class="loader__panel loader__panel--right" aria-hidden="true"></div>
     <div class="loader__content">
-      <p class="loader__label" id="loader-title">Initializing portfolio</p>
-      <output class="loader__progress" data-loader-progress>0%</output>
-      <p class="loader__message" data-loader-message aria-live="polite">Loading interface</p>
-      <button class="loader__skip" type="button" data-loader-skip>Skip introduction</button>
+      <p class="loader__label loader__reveal" id="loader-title">Loading portfolio</p>
+      <div class="loader__meter loader__reveal" role="progressbar" aria-labelledby="loader-title"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-loader-meter>
+        <span class="loader__progress" aria-hidden="true" data-loader-progress>0%</span>
+        <span class="loader__line" aria-hidden="true"><span class="loader__line-fill" data-loader-line></span></span>
+      </div>
+      <p class="loader__message loader__reveal" aria-hidden="true" data-loader-message>Loading typography</p>
+      <button class="loader__skip loader__reveal" type="button" data-loader-skip>Skip intro</button>
     </div>
   </div>
 
@@ -815,11 +867,11 @@
             <span class="section-intro__index">03</span>
             <div>
               <p class="section-label">Selected work</p>
-              <p><output data-project-count>3 projects</output> / <span data-active-filter>All</span></p>
+              <p><output data-project-count>4 projects</output> / <span data-active-filter>All</span></p>
             </div>
           </div>
-          <p class="section-intro__copy">Three self-directed products spanning business intelligence, healthcare
-            discovery, and immersive commerce.</p>
+          <p class="section-intro__copy">Four self-directed projects spanning business intelligence, healthcare
+            discovery, immersive commerce, and illustrated storytelling.</p>
         </header>
 
         <h2 class="projects-section__title" id="projects-title" data-reveal="clip" data-speed="0.3">Digital products
@@ -846,7 +898,7 @@
           <div class="dynamic-fallback dynamic-fallback--light" data-dynamic-fallback>
             <p class="section-label">Selected work / Loading</p>
             <h3>Project cases are being prepared.</h3>
-            <p>The portfolio will show three case studies here.</p>
+            <p>The portfolio will show four case studies here.</p>
           </div>
         </div>
 
@@ -863,6 +915,14 @@
             <article>
               <h3>gocart</h3>
               <p>Immersive 3D commerce experience.</p>
+            </article>
+            <article>
+              <h3>A Day in Dhaka</h3>
+              <p>A frontend illustrated storyboard following Mama's Tong through a day in Dhaka.</p>
+              <a href="https://a-day-in-dhaka-city.dipshahriarislam.workers.dev/" target="_blank"
+                rel="noopener noreferrer">View live site<span class="visually-hidden"> (opens in a new tab)</span></a>
+              <a href="https://github.com/Shahriar-Dev27/A-day-In-Dhaka-City-" target="_blank"
+                rel="noopener noreferrer">View source<span class="visually-hidden"> (opens in a new tab)</span></a>
             </article>
           </div>
         </noscript>
@@ -993,7 +1053,7 @@
                 <span aria-hidden="true">↗</span></a>
               <button type="button" class="copy-email" data-email="dipshahriar27@gmail.com" data-cursor="COPY">Copy
                 email</button>
-              <a class="contact-action" href="https://github.com/Eldorado10?tab=repositories" target="_blank"
+              <a class="contact-action" href="https://github.com/Shahriar-Dev27" target="_blank"
                 rel="noopener noreferrer" data-cursor="OPEN">View GitHub <span class="visually-hidden">(opens in a new
                   tab)</span></a>
             </div>
@@ -1019,10 +1079,10 @@
           </dl>
 
           <nav class="contact-socials" aria-label="Profile and contact links">
-            <a href="https://github.com/Eldorado10?tab=repositories" target="_blank" rel="noopener noreferrer"><span
+            <a href="https://github.com/Shahriar-Dev27" target="_blank" rel="noopener noreferrer"><span
                 class="social-link__label"><img class="social-icon" src="favicon/github.png" width="16" height="16"
                   alt="" aria-hidden="true">GitHub</span><span aria-hidden="true">↗</span></a>
-            <a href="https://www.linkedin.com/in/mr-eldorado-536900229/" target="_blank" rel="noopener noreferrer"><span
+            <a href="https://www.linkedin.com/in/shahriar-islam-536900229/" target="_blank" rel="noopener noreferrer"><span
                 class="social-link__label"><img class="social-icon" src="favicon/Linkdin.png" width="16" height="16"
                   alt="" aria-hidden="true">LinkedIn</span><span aria-hidden="true">↗</span></a>
             <a href="mailto:dipshahriar27@gmail.com"><span class="social-link__label"><img class="social-icon"
@@ -1037,7 +1097,7 @@
 
   <dialog class="project-dialog" aria-labelledby="project-dialog-title" aria-describedby="project-dialog-summary"
     data-project-dialog>
-    <div class="project-dialog__shell">
+    <div class="project-dialog__shell" data-lenis-prevent>
       <header class="project-dialog__header">
         <p><span data-dialog-number>01</span> / <span data-dialog-case-type>Self-directed project</span></p>
         <button type="button" class="project-dialog__close" aria-label="Close project details" data-dialog-close
@@ -1130,9 +1190,9 @@
           <p>Dhaka / <span data-local-time>--:--</span></p>
         </div>
         <nav class="site-footer__socials" aria-label="Footer profile and contact links"><a
-            href="https://github.com/Eldorado10?tab=repositories" target="_blank" rel="noopener noreferrer"><img
+            href="https://github.com/Shahriar-Dev27" target="_blank" rel="noopener noreferrer"><img
               class="social-icon" src="favicon/github.png" width="16" height="16" alt="" aria-hidden="true">GitHub</a><a
-            href="https://www.linkedin.com/in/mr-eldorado-536900229/" target="_blank" rel="noopener noreferrer"><img
+            href="https://www.linkedin.com/in/shahriar-islam-536900229/" target="_blank" rel="noopener noreferrer"><img
               class="social-icon" src="favicon/Linkdin.png" width="16" height="16" alt=""
               aria-hidden="true">LinkedIn</a><a href="mailto:dipshahriar27@gmail.com"><img class="social-icon"
               src="favicon/gmail.png" width="16" height="16" alt="" aria-hidden="true">Email</a></nav>
