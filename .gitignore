@@ -1,0 +1,13 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel
+
+# node
+node_modules/
+
+# agency workspace
+.agency/

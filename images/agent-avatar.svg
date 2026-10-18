@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">Refined playful portfolio agent avatar</title><desc id="desc">Playful face-only portrait with swept black hair, brown eyes, warm skin, a moustache and short goatee, with cyan hair accents on a transparent background.</desc>
+<defs><linearGradient id="skin" x2=".8" y2="1"><stop stop-color="#eeb18a"/><stop offset="1" stop-color="#bd7857"/></linearGradient><linearGradient id="hair" x2=".6" y2="1"><stop stop-color="#343039"/><stop offset="1" stop-color="#121219"/></linearGradient></defs>
+<g stroke="#28212a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+<g id="ears" fill="#c88965"><path d="M130 246C91 220 96 304 136 317L151 267Z"/><path d="M381 246C419 220 415 304 377 317L362 267Z"/></g>
+<path id="face" fill="url(#skin)" d="M133 197Q128 143 256 139Q383 144 380 204L376 300Q368 369 321 414Q290 444 256 445Q218 443 183 410Q140 366 135 302Z"/>
+<path fill="#ad6a50" stroke="none" opacity=".35" d="M144 291Q156 370 209 410Q255 447 303 415Q350 385 373 319Q364 387 318 426Q258 475 195 422Q145 378 144 291"/>
+<path id="hair" fill="url(#hair)" d="M130 258L112 217Q90 190 109 157L90 163Q104 121 145 108L126 104Q160 72 197 72Q215 48 259 53L249 40Q295 32 333 55Q366 34 388 57Q422 72 411 107Q450 132 421 175Q418 214 383 257L371 197Q357 166 330 160Q246 184 184 161Q145 187 140 225Z"/>
+<g fill="none" stroke="#53505a" stroke-width="5"><path d="M119 162Q183 94 288 109Q354 117 377 73"/><path d="M139 130Q205 71 308 87Q356 94 362 59"/><path d="M166 151Q231 115 299 139Q364 156 402 111"/><path d="M291 60Q329 73 326 111"/></g>
+<g fill="none" stroke="#43dce8" stroke-width="5"><path d="M386 71Q421 113 380 151"/><path d="M401 163L387 190"/></g>
+<g id="brows" fill="#33292a" stroke-width="3"><path d="M164 232Q195 208 225 228L230 239Q197 225 164 239Z"/><path d="M281 224Q315 202 348 226L348 234Q315 220 281 236Z"/></g>
+<g id="eyes" stroke-width="4"><path fill="#fff4e7" d="M165 259Q194 235 225 258Q197 282 165 259Z"/><path fill="#fff4e7" d="M285 258Q315 235 346 259Q316 282 285 258Z"/><ellipse fill="#62402f" cx="197" cy="259" rx="13" ry="16"/><ellipse fill="#62402f" cx="314" cy="259" rx="13" ry="16"/><g fill="#211d21" stroke="none"><ellipse cx="198" cy="260" rx="6" ry="10"/><ellipse cx="313" cy="260" rx="6" ry="10"/></g><g fill="white" stroke="none"><circle cx="201" cy="254" r="4"/><circle cx="317" cy="254" r="4"/></g></g>
+<path id="nose" fill="none" stroke="#985c45" stroke-width="5" d="M250 268L238 307Q255 320 274 307"/>
+<path id="moustache" fill="#382a27" stroke-width="2" d="M213 335Q226 318 244 326L256 332L268 326Q290 321 301 345Q280 335 263 343L255 340Q234 340 210 348Z"/>
+<path id="mouth" fill="#c57e6d" stroke="#75483e" stroke-width="3" d="M216 350Q255 359 296 348Q280 376 256 377Q232 376 216 350Z"/><path fill="none" stroke="#824b43" stroke-width="3" d="M220 353Q256 364 291 351"/>
+<path fill="#fff7ed" stroke="none" d="M224 355Q256 363 287 353L280 361Q255 368 231 361Z"/><ellipse fill="#e99080" stroke="none" opacity=".25" cx="176" cy="307" rx="21" ry="11"/><ellipse fill="#e99080" stroke="none" opacity=".25" cx="335" cy="307" rx="21" ry="11"/><path id="goatee" fill="#332928" stroke-width="2" d="M234 387Q254 393 274 386L268 402Q255 412 243 403Z"/>
+<path id="beard" fill="#392c29" stroke="none" d="M159 333Q177 386 212 407Q254 437 298 408Q341 385 359 336Q350 391 309 421Q257 461 204 424Q167 395 159 333Z"/>
+<g stroke="#5c4035" stroke-width="2" opacity=".65"><path d="M166 345L174 357M177 363L184 373M188 380L197 389M339 351L334 363M327 374L319 384M307 395L300 402"/></g>
+</g></svg>
+
+

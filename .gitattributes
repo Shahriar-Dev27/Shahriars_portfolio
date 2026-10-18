@@ -1,0 +1,2 @@
+# Keep the owner-supplied avatar byte-for-byte (no CRLF normalisation); its sha256 is pinned in the plan.
+images/agent-avatar.svg -text

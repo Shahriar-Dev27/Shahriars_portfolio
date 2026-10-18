@@ -10,6 +10,52 @@ const LOADER_LEAVE_FALLBACK_MS = 960; // exit cleanup fallback if transitionend 
 const MODE_STORAGE_KEY = "portfolio-preferred-mode";
 const PROJECT_FILTER_SESSION_KEY = "portfolio-project-filter";
 const MAX_CANVAS_DPR = 2;
+const CHAT_ENDPOINT = "/api/chat";
+const CHAT_HISTORY_SESSION_KEY = "portfolio-chat-history";
+// keep in sync with api/_lib/config.js (MAX_USER_MESSAGE_CHARS, MAX_HISTORY_MESSAGES)
+const CHAT_MAX_MESSAGE_CHARS = 500;
+const CHAT_HISTORY_SEND_LIMIT = 10;
+const CHAT_HISTORY_STORE_LIMIT = 30;
+const CHAT_REQUEST_TIMEOUT_MS = 25_000; // above the server's 20 s total provider budget (api/_lib/config.js TOTAL_BUDGET_MS)
+const CHAT_COUNTER_THRESHOLD = 400;
+const CHAT_LOG_NODE_LIMIT = 60; // oldest on-screen messages are dropped beyond this
+const CHAT_BODY_BUDGET_BYTES = 15_500; // keep in sync with api/_lib/config.js (MAX_BODY_BYTES: 16_384), minus headroom
+const CHAT_CLOSE_DELAY_MS = 180; // matches closeProjectDialog()
+const CHAT_AVATAR_SRC = "images/agent-avatar.svg";
+const CHAT_SHEET_QUERY = "(max-width: 47.99rem), (orientation: landscape) and (max-height: 39rem) and (max-width: 64rem)"; // identical to the sheet-mode media query in style.css
+// All user-facing chat copy lives here (draft pending owner input on voice and tone); swap strings without touching logic.
+const CHAT_COPY = {
+  launcherLabel: "Ask SID.agent: chat with Shahriar's agent",
+  launcherLabelOpen: "Close chat with Shahriar's agent",
+  launcherHint: "Ask SID.agent",
+  title: "SID.agent",
+  youLabel: "You",
+  agentSaid: "SID.agent said: ",
+  userSaid: "You said: ",
+  greeting: "Hey, I'm SID.agent, Shahriar's unofficial sidekick. I know his projects, his stack, and roughly how many \"final_v2\" files it took to ship them. What do you want to know?",
+  placeholder: "Ask about his work, stack, or projects…",
+  inputLabel: "Message SID.agent",
+  typing: "SID.agent is typing",
+  offline: "Your internet just stepped out for a tea break. Reconnect and I'll pick up where we left off.",
+  network: "My brain is buffering harder than Dhaka traffic at 6 PM. Try again in a moment, or email Shahriar at dipshahriar27@gmail.com.",
+  tooLong: "That's longer than most project briefs Shahriar gets. Keep it under 500 characters.",
+  retry: "Retry ↻",
+  reset: "Reset",
+  resetDone: "Conversation cleared. Fresh start, zero judgement. Mostly.",
+  close: "Close",
+  closeLabel: "Close chat",
+  opened: "Chat with Shahriar's agent opened.",
+  closed: "Chat closed.",
+  disclaimer: "AI sidekick, not Shahriar. It can be wrong. Messages go to third-party AI providers, so skip personal info.",
+};
+// label is the chip text; message is what is actually sent.
+const CHAT_SUGGESTIONS = [
+  { label: "Why hire you?", message: "Why should I hire Shahriar?" },
+  { label: "Roast React", message: "Roast React for me, then tell me how Shahriar uses it." },
+  { label: "Best project?", message: "Show me Shahriar's best project." },
+  { label: "The stack", message: "What's Shahriar's tech stack?" },
+  { label: "Contact", message: "How do I contact Shahriar?" },
+];
 
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 let initialPagePositionPending = false;
@@ -283,6 +329,7 @@ const appState = {
   processSelectionManual: false,
   testimonialIndex: 0,
   statementVisible: false,
+  chatOpen: false,
 };
 
 const scrollLocks = new Set();
@@ -301,6 +348,7 @@ let testimonialRuntime = null;
 let statementRuntime = null;
 let copyEmailRuntime = null;
 let backToTopTimer = 0;
+let chatRuntime = null;
 
 function syncScrollLock() {
   const shouldLock = scrollLocks.size > 0;
@@ -672,6 +720,7 @@ function initMobileMenu() {
 
     if (open) {
       lockPageScroll("mobile-menu");
+      if (appState.chatOpen) closeChat({ restoreFocus: false });
       if (appState.heroInteractionMode === "explore") exitExploreMode({ restoreFocus: false });
       previousFocus = document.activeElement;
       menu.hidden = false;
@@ -1989,6 +2038,7 @@ function renderProjectDialog(projectId, announce = false) {
 function openProjectDialog(projectId, trigger) {
   if (!projectRuntime?.dialog || appState.projectDialogOpen || appState.mobileMenuOpen) return;
   if (appState.heroInteractionMode === "explore") exitExploreMode({ restoreFocus: false });
+  if (appState.chatOpen) closeChat({ restoreFocus: false });
   projectRuntime.lastTrigger = trigger instanceof HTMLElement ? trigger : null;
   renderProjectDialog(projectId, false);
   appState.projectDialogOpen = true;
@@ -2089,7 +2139,7 @@ function initProjectCards() {
 
 function initMagneticElements() {
   const magneticTargets = document.querySelectorAll(
-    ".site-navigation a, .contact-pill, .mode-selector__option, .hero-mode__button, .project-filters button, .contact-action, .copy-email, .back-to-top, .back-to-scroll, .project-dialog__close, .loader__skip"
+    ".site-navigation a, .contact-pill, .mode-selector__option, .hero-mode__button, .project-filters button, .contact-action, .copy-email, .back-to-top, .back-to-scroll, .project-dialog__close, .loader__skip, .chat-launcher"
   );
   magneticTargets.forEach((element) => {
     element.classList.add("is-magnetic");
@@ -2781,6 +2831,483 @@ function initBackToTop() {
   document.querySelector("[data-back-to-top]")?.addEventListener("click", scrollToTop);
 }
 
+function initChatAgent() {
+  const launcher = document.querySelector("[data-chat-launcher]");
+  const panel = document.querySelector("[data-chat-panel]");
+  const log = panel?.querySelector("[data-chat-log]");
+  const typing = panel?.querySelector("[data-chat-typing]");
+  const status = panel?.querySelector("[data-chat-status]");
+  const suggestions = panel?.querySelector("[data-chat-suggestions]");
+  const form = panel?.querySelector("[data-chat-form]");
+  const input = panel?.querySelector("[data-chat-input]");
+  const send = panel?.querySelector("[data-chat-send]");
+  const count = panel?.querySelector("[data-chat-count]");
+  const resetButton = panel?.querySelector("[data-chat-reset]");
+  const closeButton = panel?.querySelector("[data-chat-close]");
+  if (!launcher || !panel || !log || !typing || !status || !suggestions || !form || !input || !send || !count || !resetButton || !closeButton) return;
+
+  chatRuntime = {
+    launcher,
+    panel,
+    log,
+    typing,
+    status,
+    suggestions,
+    form,
+    input,
+    send,
+    count,
+    resetButton,
+    closeButton,
+    history: [],
+    pending: false,
+    abortController: null,
+    closeTimer: 0,
+    messageCount: 0,
+  };
+
+  // Static markup carries the same strings as a no-JS fallback; CHAT_COPY stays the single source once JS runs.
+  launcher.setAttribute("aria-label", CHAT_COPY.launcherLabel);
+  const launcherHint = launcher.querySelector(".chat-launcher__label");
+  if (launcherHint) launcherHint.textContent = CHAT_COPY.launcherHint;
+  const title = panel.querySelector("#chat-title");
+  if (title) title.textContent = CHAT_COPY.title;
+  const inputLabel = panel.querySelector("label[for='chat-input']");
+  if (inputLabel) inputLabel.textContent = CHAT_COPY.inputLabel;
+  const typingLabel = typing.querySelector(".chat-typing__label");
+  if (typingLabel) typingLabel.textContent = CHAT_COPY.typing;
+  const disclaimer = panel.querySelector(".chat-panel__disclaimer");
+  if (disclaimer) disclaimer.textContent = CHAT_COPY.disclaimer;
+  input.placeholder = CHAT_COPY.placeholder;
+  input.maxLength = CHAT_MAX_MESSAGE_CHARS;
+  resetButton.textContent = CHAT_COPY.reset;
+  closeButton.setAttribute("aria-label", CHAT_COPY.closeLabel);
+  const closeLabel = closeButton.firstChild;
+  if (closeLabel?.nodeType === Node.TEXT_NODE) closeLabel.textContent = `${CHAT_COPY.close} `;
+
+  launcher.hidden = false;
+  document.documentElement.classList.add("has-chat-agent");
+
+  chatRuntime.history = loadChatHistory();
+  chatRuntime.history.forEach((message) => renderChatMessage(message, { restored: true }));
+  renderChatSuggestions();
+  updateChatComposer();
+
+  launcher.addEventListener("click", () => {
+    if (appState.chatOpen) closeChat();
+    else openChat();
+  });
+  closeButton.addEventListener("click", () => closeChat());
+  resetButton.addEventListener("click", resetChat);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    sendChatMessage(input.value);
+  });
+  input.addEventListener("input", updateChatComposer);
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    sendChatMessage(input.value);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!appState.chatOpen) return;
+    if (event.key === "Escape") {
+      if (event.isComposing || appState.projectDialogOpen || appState.mobileMenuOpen) return;
+      event.preventDefault();
+      // Non-modal desktop panel: only pull focus back to the launcher if focus was inside the chat.
+      const focusInChat = panel.contains(document.activeElement) || document.activeElement === launcher;
+      closeChat({ restoreFocus: isChatSheetMode() || focusInChat });
+      return;
+    }
+    if (event.key === "Tab" && isChatSheetMode()) trapChatFocus(event);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    document.documentElement.classList.toggle("chat-idle-paused", document.hidden);
+  });
+
+  const sheetQuery = window.matchMedia(CHAT_SHEET_QUERY);
+  if (typeof sheetQuery.addEventListener === "function") sheetQuery.addEventListener("change", syncChatMode);
+}
+
+function isChatSheetMode() {
+  return window.matchMedia(CHAT_SHEET_QUERY).matches;
+}
+
+// Applies (or removes) sheet-mode behaviour for the current open state and viewport: aria-modal, scroll lock, visualViewport tracking.
+function syncChatMode() {
+  if (!chatRuntime) return;
+  const sheet = appState.chatOpen && isChatSheetMode();
+  chatRuntime.panel.setAttribute("aria-modal", String(sheet));
+  document.documentElement.classList.toggle("chat-sheet-open", sheet);
+  const viewport = window.visualViewport;
+  if (sheet) {
+    lockPageScroll("chat");
+    updateChatViewportHeight();
+    viewport?.addEventListener("resize", updateChatViewportHeight);
+    viewport?.addEventListener("scroll", updateChatViewportHeight);
+  } else {
+    unlockPageScroll("chat");
+    viewport?.removeEventListener("resize", updateChatViewportHeight);
+    viewport?.removeEventListener("scroll", updateChatViewportHeight);
+    updateChatViewportHeight();
+  }
+}
+
+function openChat() {
+  if (!chatRuntime || appState.chatOpen) return;
+  const root = document.documentElement;
+  if (root.classList.contains("loader-pending") || document.body.classList.contains("loader-active")) return;
+  if (appState.mobileMenuOpen || appState.projectDialogOpen) return;
+
+  const { launcher, panel, log, input } = chatRuntime;
+  window.clearTimeout(chatRuntime.closeTimer);
+
+  // Rendered while the panel is still hidden so assistive tech is not told about it twice (the open announcement covers it).
+  if (!chatRuntime.history.length && !log.childElementCount) {
+    renderChatMessage({ role: "assistant", content: CHAT_COPY.greeting });
+  }
+  renderChatSuggestions();
+
+  appState.chatOpen = true;
+  panel.hidden = false;
+  launcher.setAttribute("aria-expanded", "true");
+  launcher.setAttribute("aria-label", CHAT_COPY.launcherLabelOpen);
+  syncChatMode();
+  log.scrollTop = log.scrollHeight;
+
+  requestAnimationFrame(() => {
+    if (!appState.chatOpen) return;
+    panel.classList.add("is-open");
+    if (window.matchMedia("(pointer: fine)").matches) input.focus({ preventScroll: true });
+    else panel.querySelector("#chat-title")?.focus({ preventScroll: true });
+  });
+  announceInteraction(CHAT_COPY.opened);
+}
+
+function closeChat({ restoreFocus = true } = {}) {
+  if (!chatRuntime || !appState.chatOpen) return;
+  const { launcher, panel } = chatRuntime;
+  appState.chatOpen = false;
+  window.clearTimeout(chatRuntime.closeTimer);
+  panel.classList.remove("is-open");
+  if (appState.reducedMotion) panel.hidden = true;
+  else {
+    chatRuntime.closeTimer = window.setTimeout(() => {
+      if (!appState.chatOpen) panel.hidden = true;
+    }, CHAT_CLOSE_DELAY_MS);
+  }
+  launcher.setAttribute("aria-expanded", "false");
+  launcher.setAttribute("aria-label", CHAT_COPY.launcherLabel);
+  syncChatMode();
+  if (restoreFocus) launcher.focus({ preventScroll: true });
+  announceInteraction(CHAT_COPY.closed);
+}
+
+function createChatAvatar() {
+  const avatar = document.createElement("span");
+  avatar.className = "chat-avatar chat-avatar--message";
+  avatar.setAttribute("aria-hidden", "true");
+  const image = document.createElement("img");
+  image.src = CHAT_AVATAR_SRC;
+  image.alt = "";
+  image.width = 28;
+  image.height = 28;
+  image.decoding = "async";
+  avatar.append(image);
+  return avatar;
+}
+
+function scrollChatLog({ smooth = false } = {}) {
+  const log = chatRuntime?.log;
+  if (!log) return;
+  log.scrollTo({ top: log.scrollHeight, behavior: smooth && !appState.reducedMotion ? "smooth" : "auto" });
+}
+
+// message { role: "user"|"assistant", content }; options { variant?: "error", restored?: boolean, onRetry?: () => void }; returns the message <div>
+function renderChatMessage(message, options = {}) {
+  const { variant = "", restored = false, onRetry = null } = options;
+  const isAgent = message.role === "assistant";
+  chatRuntime.messageCount += 1;
+
+  const item = document.createElement("div");
+  item.className = `chat-message chat-message--${isAgent ? "agent" : "user"}`;
+  if (variant === "error") item.classList.add("chat-message--error");
+  if (restored) item.classList.add("chat-message--restored");
+  if (isAgent) item.append(createChatAvatar());
+
+  const body = document.createElement("div");
+  body.className = "chat-message__body";
+
+  const meta = document.createElement("p");
+  meta.className = "chat-message__meta";
+  meta.setAttribute("aria-hidden", "true");
+  meta.textContent = `${isAgent ? CHAT_COPY.title : CHAT_COPY.youLabel} / ${String(chatRuntime.messageCount).padStart(2, "0")}`;
+
+  const bubble = document.createElement("p");
+  bubble.className = "chat-message__bubble";
+  const speaker = document.createElement("span");
+  speaker.className = "visually-hidden";
+  speaker.textContent = isAgent ? CHAT_COPY.agentSaid : CHAT_COPY.userSaid;
+  bubble.append(speaker, document.createTextNode(message.content));
+
+  body.append(meta, bubble);
+
+  if (variant === "error" && typeof onRetry === "function") {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "chat-message__retry";
+    retry.dataset.cursor = "RETRY";
+    retry.textContent = CHAT_COPY.retry;
+    retry.addEventListener("click", onRetry);
+    body.append(retry);
+  }
+
+  item.append(body);
+  chatRuntime.log.append(item);
+  while (chatRuntime.log.childElementCount > CHAT_LOG_NODE_LIMIT) chatRuntime.log.firstElementChild.remove();
+  scrollChatLog({ smooth: !restored });
+  return item;
+}
+
+function renderChatSuggestions() {
+  if (!chatRuntime) return;
+  const { suggestions } = chatRuntime;
+  suggestions.replaceChildren();
+  const hasUserTurn = chatRuntime.history.some((message) => message.role === "user");
+  suggestions.hidden = hasUserTurn;
+  if (hasUserTurn) return;
+  CHAT_SUGGESTIONS.forEach(({ label, message }) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.dataset.cursor = "ASK";
+    chip.textContent = label;
+    chip.addEventListener("click", () => sendChatMessage(message));
+    suggestions.append(chip);
+  });
+}
+
+// Auto-grows the textarea (1 to 4 lines), shows the counter near the limit, and syncs the send button.
+function updateChatComposer() {
+  if (!chatRuntime) return;
+  const { input, count, send, pending } = chatRuntime;
+  input.style.height = "auto";
+  const styles = window.getComputedStyle(input);
+  const lineHeight = Number.parseFloat(styles.lineHeight) || Number.parseFloat(styles.fontSize) * 1.5;
+  const paddingY = (Number.parseFloat(styles.paddingTop) || 0) + (Number.parseFloat(styles.paddingBottom) || 0);
+  const borderY = (Number.parseFloat(styles.borderTopWidth) || 0) + (Number.parseFloat(styles.borderBottomWidth) || 0);
+  const contentHeight = Math.max(lineHeight, input.scrollHeight - paddingY);
+  const maxHeight = lineHeight * 4;
+  const nextHeight = Math.min(contentHeight, maxHeight);
+  input.style.height = `${styles.boxSizing === "border-box" ? nextHeight + paddingY + borderY : nextHeight}px`;
+  input.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
+
+  const length = input.value.length;
+  count.textContent = `${length} / ${CHAT_MAX_MESSAGE_CHARS}`;
+  count.hidden = length < CHAT_COUNTER_THRESHOLD;
+  send.disabled = pending || !input.value.trim();
+}
+
+function setChatPending(pending) {
+  if (!chatRuntime) return;
+  chatRuntime.pending = pending;
+  chatRuntime.typing.hidden = !pending;
+  chatRuntime.panel.classList.toggle("is-pending", pending);
+  chatRuntime.status.textContent = pending ? CHAT_COPY.typing : "";
+  updateChatComposer();
+}
+
+async function sendChatMessage(text) {
+  if (!chatRuntime) return;
+  const content = String(text ?? "").trim();
+  if (!content || chatRuntime.pending) return;
+
+  // maxlength already stops typing; this guards paste and programmatic paths. The text stays in the box so it can be trimmed.
+  if (content.length > CHAT_MAX_MESSAGE_CHARS) {
+    renderChatMessage({ role: "assistant", content: CHAT_COPY.tooLong }, { variant: "error" });
+    return;
+  }
+
+  chatRuntime.log.querySelectorAll(".chat-message__retry").forEach((button) => button.remove());
+
+  const history = chatRuntime.history;
+  const userTurn = { role: "user", content };
+  history.push(userTurn);
+  trimChatHistory(history);
+  const userNode = renderChatMessage(userTurn);
+  saveChatHistory();
+  chatRuntime.input.value = "";
+  updateChatComposer();
+  renderChatSuggestions();
+
+  // Error bubbles are never stored or sent. Retry swaps the failed user turn out of history and DOM, then resends it.
+  const showError = (reply) => {
+    const errorNode = renderChatMessage({ role: "assistant", content: reply }, {
+      variant: "error",
+      onRetry: () => {
+        if (!chatRuntime || chatRuntime.pending || chatRuntime.history !== history) return;
+        const index = history.indexOf(userTurn);
+        if (index !== -1) history.splice(index, 1);
+        userNode.remove();
+        errorNode.remove();
+        saveChatHistory();
+        sendChatMessage(content);
+      },
+    });
+  };
+
+  if (navigator.onLine === false) {
+    showError(CHAT_COPY.offline);
+    return;
+  }
+
+  setChatPending(true);
+  const result = await requestChatReply(history);
+  // Reset swaps chatRuntime.history for a new array; a reply that belongs to the old conversation is dropped.
+  if (!chatRuntime || chatRuntime.history !== history) return;
+  setChatPending(false);
+
+  if (result.isError) {
+    showError(result.reply);
+    return;
+  }
+  const assistantTurn = { role: "assistant", content: result.reply };
+  history.push(assistantTurn);
+  trimChatHistory(history);
+  renderChatMessage(assistantTurn);
+  saveChatHistory();
+}
+
+async function requestChatReply(history) {
+  const controller = new AbortController();
+  chatRuntime.abortController = controller;
+  const timeoutId = window.setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
+  try {
+    const messages = history.map(({ role, content }) => ({ role, content }));
+    while (messages.length && messages[0].role === "assistant") messages.shift();
+    const body = messages.slice(-CHAT_HISTORY_SEND_LIMIT);
+    while (body.length && body[0].role === "assistant") body.shift();
+    // Multi-byte text (e.g. Bangla) can push 10 turns past the server's body cap; drop the oldest sent turns, never the last one.
+    const encoder = new TextEncoder();
+    while (body.length > 1 && encoder.encode(JSON.stringify({ messages: body })).length > CHAT_BODY_BUDGET_BYTES) {
+      body.shift();
+      while (body.length > 1 && body[0].role === "assistant") body.shift();
+    }
+
+    const response = await fetch(CHAT_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: body }),
+      signal: controller.signal,
+    });
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+    if (response.ok && typeof data?.reply === "string" && data.reply.trim()) {
+      return { reply: data.reply, isError: false };
+    }
+    if (typeof data?.error?.message === "string" && data.error.message.trim()) {
+      return { reply: data.error.message, isError: true };
+    }
+    return { reply: CHAT_COPY.network, isError: true };
+  } catch {
+    // Never surface exception text, status codes or raw response bodies.
+    return { reply: CHAT_COPY.network, isError: true };
+  } finally {
+    window.clearTimeout(timeoutId);
+    if (chatRuntime?.abortController === controller) chatRuntime.abortController = null;
+  }
+}
+
+// Trims in place (not by reassignment) so the array identity used by the reset-race check stays valid.
+function trimChatHistory(history) {
+  if (history.length > CHAT_HISTORY_STORE_LIMIT) history.splice(0, history.length - CHAT_HISTORY_STORE_LIMIT);
+}
+
+function loadChatHistory() {
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(CHAT_HISTORY_SESSION_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item
+        && (item.role === "user" || item.role === "assistant")
+        && typeof item.content === "string"
+        && item.content.length > 0
+        && item.content.length <= 1200)
+      .map((item) => ({ role: item.role, content: item.content }))
+      .slice(-CHAT_HISTORY_STORE_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveChatHistory() {
+  if (!chatRuntime) return;
+  try {
+    window.sessionStorage.setItem(CHAT_HISTORY_SESSION_KEY, JSON.stringify(chatRuntime.history.slice(-CHAT_HISTORY_STORE_LIMIT)));
+  } catch {
+    // sessionStorage can be unavailable or full; the conversation simply is not persisted.
+  }
+}
+
+function resetChat() {
+  if (!chatRuntime) return;
+  chatRuntime.abortController?.abort();
+  chatRuntime.abortController = null;
+  chatRuntime.history = [];
+  try {
+    window.sessionStorage.removeItem(CHAT_HISTORY_SESSION_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+  chatRuntime.log.replaceChildren();
+  chatRuntime.messageCount = 0;
+  chatRuntime.input.value = "";
+  setChatPending(false);
+  renderChatMessage({ role: "assistant", content: CHAT_COPY.greeting });
+  renderChatSuggestions();
+  announceInteraction(CHAT_COPY.resetDone);
+  chatRuntime.input.focus({ preventScroll: true });
+}
+
+function updateChatViewportHeight() {
+  if (!chatRuntime) return;
+  const { panel } = chatRuntime;
+  const viewport = window.visualViewport;
+  if (!appState.chatOpen || !isChatSheetMode() || !viewport) {
+    panel.style.removeProperty("--chat-viewport-height");
+    panel.style.removeProperty("top");
+    return;
+  }
+  panel.style.setProperty("--chat-viewport-height", `${viewport.height}px`);
+  // iOS can scroll the visual viewport inside the layout viewport when the keyboard opens; follow it.
+  panel.style.top = `${viewport.offsetTop}px`;
+}
+
+function trapChatFocus(event) {
+  if (!chatRuntime || !appState.chatOpen) return;
+  const { panel } = chatRuntime;
+  const focusable = [...panel.querySelectorAll("button:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")]
+    .filter((element) => element.getClientRects().length > 0);
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (!first || !last) return;
+
+  const active = document.activeElement;
+  const title = panel.querySelector("#chat-title");
+  if (event.shiftKey && (active === first || active === title || !panel.contains(active))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || !panel.contains(active))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function runInitializer(label, initializer) {
   try {
     initializer();
@@ -2810,6 +3337,7 @@ function initApp() {
     ["Circular statement", initCircularText],
     ["Copy email", initCopyEmail],
     ["Back to top", initBackToTop],
+    ["Chat agent", initChatAgent],
     ["Scroll reveals", initScrollReveals],
     ["Custom cursor", initCustomCursor],
     ["Magnetic elements", initMagneticElements],

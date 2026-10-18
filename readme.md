@@ -40,6 +40,7 @@ This is the personal portfolio of **Shahriar Islam Dip** — a Computer Science 
 | **Full Accessibility** | Semantic HTML, ARIA attributes, keyboard navigation, focus management, reduced-motion support, skip links |
 | **No-JS Fallbacks** | All critical content readable without JavaScript via `<noscript>` blocks |
 | **Custom Cursor** | Context-aware cursor with labeled states (OPEN, EXPLORE, SCROLL, REVEAL, FILTER, STEP, CONTACT, CLOSE, PREV, NEXT, TOP, COPY, CONNECT, MENU) |
+| **SID.agent Chat** | AI chat widget answering visitor questions through one Vercel serverless function, with Gemini, Mistral and Groq fallbacks; provider keys stay server-side |
 
 ---
 
@@ -54,6 +55,7 @@ This is the personal portfolio of **Shahriar Islam Dip** — a Computer Science 
 | **Architecture** | Single-page, modular CSS/JS, data-attribute hooks, zero build step |
 | **Performance** | Preloaded hero assets, lazy-loaded images, `decoding="async"`, resource hints |
 | **Accessibility** | WCAG 2.1 AA target, semantic landmarks, live regions, focus trapping in dialogs |
+| **AI chat** | Vercel Function (Node 24), Gemini, then Mistral, then Groq fallback |
 
 ---
 
@@ -65,12 +67,19 @@ The_Portfolio/
 ├── style.css               # Complete design system + component styles
 ├── script.js               # Core portfolio logic (modes, interactions, dialogs, filters)
 ├── liquid-background.js    # WebGL liquid background effect
+├── api/                    # AI chat serverless function (/api/chat) and its modules
+├── scripts/                # Local dev server (npm run dev / npm run dev:mock)
+├── tests/                  # node:test suite (npm test)
+├── package.json            # npm scripts only; no runtime dependencies
+├── vercel.json             # Function limit and security headers
+├── .env.example            # Template for .env.local (real keys are never committed)
 ├── favicon/
 │   ├── SID.png             # Favicon (32×32)
 │   ├── github.png          # Social icons
 │   ├── Linkdin.png
 │   └── gmail.png
 ├── images/
+│   ├── agent-avatar.svg            # SID.agent chat avatar (illustrated portrait)
 │   ├── developer-placeholder.png   # Hero portrait (1067×1402)
 │   ├── socialpage.png              # Statement section portrait (1122×1402)
 │   ├── screenshotPortfolio.png     # Portfolio preview screenshot
@@ -82,7 +91,7 @@ The_Portfolio/
 └── README.md               # This file
 ```
 
-> **Note:** No build tooling, bundlers, or package managers required. Open `index.html` directly or serve via any static server.
+> **Note:** No build tooling, bundlers, or package managers required. Open `index.html` directly or serve via any static server. The optional AI chat is the only part that needs a runtime: one Vercel serverless function (`api/chat.js`) on Node 24, with no build step and no npm dependencies. The page works without it; the chat widget just needs `/api/chat`.
 
 ---
 
@@ -103,6 +112,8 @@ npx serve .
 php -S localhost:8080
 ```
 Then open `http://localhost:8080` in your browser.
+
+> The options above serve the static site only, not `/api/chat`, so the chat widget will not answer. For the chat, run `npm run dev` (with a `.env.local`) or `npm run dev:mock` (no keys needed) and open `http://localhost:3000`.
 
 ---
 
@@ -159,7 +170,7 @@ This portfolio is open source for learning and inspiration. Feel free to explore
 
 ### Requirements
 - Modern browser with ES6+ and WebGL support
-- No server-side dependencies
+- No server-side dependencies for the site itself. The optional AI chat uses one Vercel serverless function (`api/chat.js`) with zero npm dependencies.
 
 ---
 
@@ -342,6 +353,8 @@ The portfolio respects `@media (prefers-reduced-motion: reduce)`:
 | **Firebase Hosting** | `firebase deploy` (configure `public: "."`) |
 | **Surge.sh** | `surge . your-domain.surge.sh` |
 
+> **Note:** The AI chat needs Vercel, or another host that can run `api/chat.js`. On the other static hosts the site works, but `/api/chat` is missing, so the chat widget shows its friendly error message instead of replies.
+
 ### Custom Domain
 1. Add `CNAME` file with your domain (or configure in host dashboard)
 2. Update `<link rel="canonical">` and `<meta property="og:url">` in `index.html`
@@ -353,6 +366,90 @@ The portfolio respects `@media (prefers-reduced-motion: reduce)`:
 - [ ] Set long-term caching for static assets (`Cache-Control: public, max-age=31536000, immutable`)
 - [ ] Verify no console errors
 - [ ] Run Lighthouse (target: Performance ≥ 90, Accessibility ≥ 95, Best Practices ≥ 90, SEO ≥ 90)
+
+## 🤖 SID.agent (AI portfolio chat)
+
+SID.agent is the chat widget on the site. It answers visitors' questions about Shahriar's work using free-tier LLM APIs, called from a Vercel serverless function at `/api/chat`. Provider keys live only in Vercel environment variables and in your local `.env.local`. They never reach the browser or git.
+
+### Architecture
+- **Widget:** `index.html`, `script.js`, `style.css`, with the avatar at `images/agent-avatar.svg` (an illustrated portrait of Shahriar Islam Dip)
+- **Endpoint:** `api/chat.js` and the modules in `api/_lib/` (`handler.js`, `providers.js`, `origin.js`, `rate-limit.js`, `validate.js`, `respond.js`, `persona.js`, `config.js`)
+- **Provider order:** Gemini, then Mistral, then Groq (Groq is skipped unless `GROQ_API_KEY` is set)
+- **Fallback:** a provider that returns 400, 401, 403, 404, 429 or a 5xx, times out, or returns an empty or unparseable reply hands the request to the next provider. Only HTTP 422 stops the chain, which returns `502 upstream_rejected`. If every provider fails, the visitor gets a friendly canned reply. If no key is configured at all, the endpoint returns `503 not_configured`.
+
+### Environment Variables
+
+| Name | Required | Default | Notes |
+|---|---|---|---|
+| `GEMINI_API_KEY` | yes | none | Google AI Studio key (primary) |
+| `MISTRAL_API_KEY` | yes | none | Mistral console key (fallback 1) |
+| `GROQ_API_KEY` | optional | none | Groq console key (fallback 2); the provider is skipped if unset |
+| `GEMINI_MODEL` | no | `gemini-3.8-flash` | current stable Flash model; override it if it is retired |
+| `GEMINI_REASONING_EFFORT` | no | `minimal` | sent as `reasoning_effort`; set to the empty string to omit it |
+| `MISTRAL_MODEL` | no | `mistral-small-latest` | alias, survives version bumps |
+| `GROQ_MODEL` | no | `llama-3.3-70b-versatile` | a Groq production model |
+| `ALLOWED_ORIGINS` | yes in production | none | comma-separated exact origins, e.g. `https://example.com,https://www.example.com`. Use lowercase, include the scheme, no path. List both apex and `www` if both serve the site. A mismatch makes real visitors get the "forbidden" reply. |
+| `VERCEL_ENV`, `VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL` | automatic | | Vercel system variables. "Automatically expose System Environment Variables" must stay enabled. |
+
+At least one provider key is needed. Set all three keys if you want the fallback chain.
+
+### Getting Free Keys
+- **Gemini:** Google AI Studio (`aistudio.google.com/app/apikey`)
+- **Mistral:** Mistral console (`console.mistral.ai/api-keys`)
+- **Groq:** Groq console (`console.groq.com/keys`)
+
+Free-tier limits and model names change. Check each provider's page before relying on them. Never paste a key into the repo, a commit message or an issue.
+
+### Adding Keys in Vercel
+1. Open the project on Vercel, then go to **Settings**, then **Environment Variables**.
+2. Add each key for **Production** and **Preview**.
+3. Set `ALLOWED_ORIGINS` for **Production**.
+4. Redeploy so the new variables take effect.
+
+These variables must stay server-side. Do not give them a public prefix (such as `NEXT_PUBLIC_`), and do not reference them in client code.
+
+### Local Development
+- **With real providers:** copy `.env.example` to `.env.local` (git-ignored), add your keys, then run `npm run dev`. The dev server reads `.env.local` when it starts, so restart it after editing.
+- **Without keys:** run `npm run dev:mock`. It uses fake keys and makes no network calls. Pick another mock mode with `node scripts/dev-server.js --mock=<mode>`:
+  - `ok` (default): canned replies after a short delay
+  - `slow`: a longer delay
+  - `fatal`: Gemini returns 422, so the endpoint answers 502
+  - `fallthrough`: Gemini returns 401, and Mistral answers
+  - `down` or `fail`: every provider returns 503, so the visitor gets a canned reply
+  - `ratelimit`: mock providers with the real rate limiter
+- **With Vercel's runtime:** after `vercel link` and `vercel env pull .env.local`, `npx vercel dev` runs the function the way Vercel does.
+- **Port 3000:** the dev server runs at `http://localhost:3000` (use `--port N` or the `PORT` variable to change it). The chat origin allowlist only covers port 3000. On another port, add `ALLOWED_ORIGINS=http://localhost:<port>` (the dev server prints this hint).
+
+### Tests
+Run `npm test`. It uses Node's built-in test runner (`node:test`) over `tests/**/*.test.js`, and it makes no network calls.
+
+### Rate Limits and Limitations
+> Best effort: state lives in one warm function instance. It resets on cold start and is not shared across concurrent instances. The real ceiling is the providers' own free-tier quotas.
+
+The Origin check stops other websites from calling the endpoint from a browser. It does not stop scripts or `curl`, which can send any Origin header.
+
+Messages are sent to third-party AI providers. Free tiers may use prompts to improve the providers' models, so visitors should not share personal information. The widget's disclaimer says the same.
+
+### Customising the Persona
+- **`api/_lib/persona.js`:** `SYSTEM_PROMPT` (voice and rules), `FACTS` (what the model may state) and `FALLBACK_REPLIES` (canned replies)
+- **`script.js`:** `CHAT_COPY` (widget text, including the disclaimer) and `CHAT_SUGGESTIONS` (suggested questions), both near the top of the file
+- **Keep `FACTS` in sync with the site.** `tests/persona.test.js` checks project titles, live URLs, stack, process and contact details against `script.js` and `index.html`. Run `npm test` after every change.
+
+### Deploying the Chat on Vercel
+Follow the steps in [Adding Keys in Vercel](#adding-keys-in-vercel), then check the live deployment:
+- [ ] The chat returns a reply to a test message.
+- [ ] `/api/_lib/persona.js`, `/docs/...`, `/tests/...`, `/scripts/...` and `/.env.example` return 404.
+- [ ] A POST to `/api/chat` with an Origin that is not in `ALLOWED_ORIGINS` returns 403.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `503 not_configured` | No provider key is set in this environment | Add at least one key in Vercel (Production and/or Preview), or in `.env.local`, then redeploy or restart |
+| `403 forbidden_origin` (the visitor sees the "forbidden" reply) | The site's origin is not in `ALLOWED_ORIGINS`. Check the scheme, `www` versus apex, trailing paths and letter case | Set the exact origin in `ALLOWED_ORIGINS`, then redeploy |
+| Repeated canned replies | Every provider is failing: free-tier quota used up, bad keys, or a retired model name | Check each provider's usage and key status, then check the model variables below |
+| `502 upstream_rejected` | A provider answered HTTP 422, which stops the chain and is never retried | Check the model names and `GEMINI_REASONING_EFFORT`, then check the provider's status page |
+| Model name changed or retired | The provider removed or renamed a model | Set `GEMINI_MODEL`, `MISTRAL_MODEL` or `GROQ_MODEL` to a current model name in Vercel, then redeploy |
 
 ---
 
