@@ -1,7 +1,7 @@
 /**
  * Local dev server: serves the static site and routes /api/chat to the real handler.
  *
- *   node scripts/dev-server.js                 Groq, key from .env.local
+ *   node scripts/dev-server.js                 Groq + optional NVIDIA, keys from .env.local
  *   node scripts/dev-server.js --mock[=mode]   no keys, no network (see MOCK_MODES)
  *   node scripts/dev-server.js --port 4000     default 3000 (also PORT env)
  *
@@ -144,7 +144,7 @@ export function loadEnvLocal(file) {
 }
 
 /**
- * "groq: yes". Presence only, never a value.
+ * "groq: yes, nvidia: no". Presence only, never a value.
  * @param {Record<string, string | undefined>} env
  * @returns {string}
  */
@@ -161,17 +161,19 @@ export function describeProviderKeys(env) {
  * canned reply). delayMs is applied before every answer.
  */
 export const MOCK_MODES = Object.freeze({
-  ok: { delayMs: 600, statuses: { groq: 200 } },
-  slow: { delayMs: 3000, statuses: { groq: 200 } },
-  fatal: { delayMs: 0, statuses: { groq: 422 } },
-  unauthorized: { delayMs: 0, statuses: { groq: 401 } },
-  down: { delayMs: 0, statuses: { groq: 503 } },
-  fail: { delayMs: 0, statuses: { groq: 503 } },
-  ratelimit: { delayMs: 600, statuses: { groq: 200 } },
+  ok: { delayMs: 600, statuses: { groq: 200, nvidia: 200 } },
+  slow: { delayMs: 3000, statuses: { groq: 200, nvidia: 200 } },
+  fatal: { delayMs: 0, statuses: { groq: 422, nvidia: 422 } },
+  unauthorized: { delayMs: 0, statuses: { groq: 401, nvidia: 503 } },
+  backup: { delayMs: 0, statuses: { groq: 429, nvidia: 200 } },
+  down: { delayMs: 0, statuses: { groq: 503, nvidia: 503 } },
+  fail: { delayMs: 0, statuses: { groq: 503, nvidia: 503 } },
+  ratelimit: { delayMs: 600, statuses: { groq: 200, nvidia: 200 } },
 });
 
 const MOCK_REPLIES = Object.freeze({
   groq: "Mock reply from groq. Shahriar writes code fast, but this reply was faster and has no bugs.",
+  nvidia: "Mock reply from nvidia. Shahriar keeps a backup brain on standby; the coffee budget was getting out of hand.",
 });
 
 const PROVIDER_BY_URL = new Map(PROVIDER_ORDER.map((id) => [PROVIDERS[id].url, id]));

@@ -1,5 +1,5 @@
 /**
- * Groq-only provider for the chat endpoint, through its OpenAI-compatible endpoint.
+ * Groq primary and optional NVIDIA backup, through OpenAI-compatible endpoints.
  *
  * Nothing in this module returns or logs a key, an upstream response body, a user
  * message or a model reply. Log lines are exactly { provider, status, reason, ms }.
@@ -12,15 +12,15 @@ import {
   FATAL_UPSTREAM_STATUSES,
 } from "./config.js";
 
-/** @typedef {{ id: "groq", url: string, model: string, apiKey: string, maxTokens: number, extraBody: object }} Provider */
+/** @typedef {{ id: "groq"|"nvidia", url: string, model: string, apiKey: string, maxTokens: number, extraBody: object }} Provider */
 
 /** @typedef {{ ok: true, text: string } | { ok: false, retryable: boolean, status: number | null, reason: "timeout"|"network"|"http"|"bad_json"|"empty" }} CallResult */
 
-/** @typedef {{ ok: true, text: string, source: "groq" } | { ok: false, fatal: boolean }} ChainResult */
+/** @typedef {{ ok: true, text: string, source: "groq"|"nvidia" } | { ok: false, fatal: boolean }} ChainResult */
 
 /**
- * Configure one Groq request using one key. Other providers' keys are ignored.
- * GPT-OSS uses low reasoning effort and omits reasoning from the response.
+ * Try Groq first, then NVIDIA when its key is set. Missing keys skip that provider.
+ * GPT-OSS uses low reasoning effort. Only final message content is returned.
  * @param {Record<string, string | undefined>} env
  * @returns {Provider[]}
  */
@@ -35,7 +35,7 @@ export function buildProviderChain(env) {
     const model = env[def.modelEnv] || def.defaultModel;
     const maxTokens = LIMITS.MAX_OUTPUT_TOKENS;
     const extraBody = model.startsWith("openai/gpt-oss-")
-      ? { reasoning_effort: "low", include_reasoning: false }
+      ? { reasoning_effort: "low", ...(id === "groq" ? { include_reasoning: false } : {}) }
       : {};
     chain.push({ id, url: def.url, model, apiKey, maxTokens, extraBody });
   }
@@ -96,7 +96,7 @@ export async function callProvider(provider, messages, { fetchImpl = fetch, time
       ...messages.map(({ role, content }) => ({ role, content })),
     ],
     temperature: LIMITS.TEMPERATURE,
-    max_completion_tokens: provider.maxTokens,
+    [provider.id === "nvidia" ? "max_tokens" : "max_completion_tokens"]: provider.maxTokens,
     stream: false,
     ...provider.extraBody,
   };
@@ -196,8 +196,9 @@ function discardBody(res) {
 }
 
 /**
- * Make a single Groq attempt within the time budget. Only HTTP 422 is fatal;
- * other failures use the canned reply without retrying or calling another provider.
+ * Try each configured provider once within the time budget. A successful Groq
+ * response skips NVIDIA. Any Groq failure allows NVIDIA to answer. If all fail,
+ * a 422 produces an upstream error; otherwise the handler uses a canned reply.
  * @param {Provider[]} chain
  * @param {{ role: string, content: string }[]} messages
  * @param {{ fetchImpl?: typeof fetch, systemPrompt: string, now?: () => number, logger?: { info: Function, warn: Function }, limits?: typeof LIMITS }} options
@@ -209,11 +210,12 @@ export async function runProviderChain(
   { fetchImpl, systemPrompt, now = Date.now, logger = console, limits = LIMITS },
 ) {
   const start = now();
+  let fatal = false;
 
   for (const provider of chain) {
     const remaining = limits.TOTAL_BUDGET_MS - (now() - start);
     if (remaining < limits.MIN_PROVIDER_BUDGET_MS) {
-      return { ok: false, fatal: false };
+      return { ok: false, fatal };
     }
 
     const timeoutMs = Math.min(limits.PROVIDER_TIMEOUT_MS, remaining);
@@ -227,10 +229,8 @@ export async function runProviderChain(
     }
 
     logger.warn({ provider: provider.id, status: result.status, reason: result.reason, ms });
-    if (!result.retryable) {
-      return { ok: false, fatal: true };
-    }
+    fatal ||= !result.retryable;
   }
 
-  return { ok: false, fatal: false };
+  return { ok: false, fatal };
 }

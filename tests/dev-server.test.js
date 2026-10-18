@@ -313,10 +313,10 @@ describe(".env.local loading (Node's process.loadEnvFile)", () => {
 
 describe("describeProviderKeys", () => {
   test("reports only yes/no per provider", () => {
-    assert.equal(describeProviderKeys({}), "groq: no");
+    assert.equal(describeProviderKeys({}), "groq: no, nvidia: no");
     assert.equal(
       describeProviderKeys({ GROQ_API_KEY: SECRET_VALUE }),
-      "groq: yes",
+      "groq: yes, nvidia: no",
     );
   });
 });

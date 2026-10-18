@@ -29,7 +29,7 @@ export const RATE_LIMITS = Object.freeze({
 });
 
 /** Order in which providers are tried. */
-export const PROVIDER_ORDER = Object.freeze(["groq"]);
+export const PROVIDER_ORDER = Object.freeze(["groq", "nvidia"]);
 
 /** Provider endpoints and the env vars that configure them. */
 export const PROVIDERS = Object.freeze({
@@ -37,11 +37,15 @@ export const PROVIDERS = Object.freeze({
     url: "https://api.groq.com/openai/v1/chat/completions",
     keyEnv: "GROQ_API_KEY", modelEnv: "GROQ_MODEL", defaultModel: "openai/gpt-oss-120b",
   }),
+  nvidia: Object.freeze({
+    url: "https://integrate.api.nvidia.com/v1/chat/completions",
+    keyEnv: "NVIDIA_API_KEY", modelEnv: "NVIDIA_MODEL", defaultModel: "openai/gpt-oss-20b",
+  }),
 });
 
 /**
- * Upstream statuses that stop the chain and return 502 upstream_rejected. Only 422 is fatal.
- * Other failures return the friendly canned reply without retries or another provider.
+ * If every configured provider fails, a 422 makes the final response 502 upstream_rejected.
+ * A provider rejection still allows the backup to answer first.
  */
 export const FATAL_UPSTREAM_STATUSES = Object.freeze([422]);
 
