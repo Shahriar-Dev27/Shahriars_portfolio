@@ -11,7 +11,7 @@ import {
 const KEY = "test-key-not-real";
 const SYSTEM_PROMPT = "SYSTEM-PROMPT-FIXTURE";
 const USER_TEXT = "secret-user-question-xyz";
-const REPLY_TEXT = "Mistral says something witty-reply-abc.";
+const REPLY_TEXT = "Groq says something witty-reply-abc.";
 const MESSAGES = [{ role: "user", content: USER_TEXT }];
 
 /** A 200 OpenAI-style completion response. */
@@ -44,8 +44,7 @@ function makeFetch(script) {
   return fetchImpl;
 }
 
-const GEMINI_HOST = "generativelanguage.googleapis.com";
-const MISTRAL_HOST = "api.mistral.ai";
+const GROQ_HOST = "api.groq.com";
 
 function makeLogger() {
   const entries = [];
@@ -58,7 +57,7 @@ function makeLogger() {
 }
 
 function chain(env = {}) {
-  return buildProviderChain({ GEMINI_API_KEY: KEY, MISTRAL_API_KEY: KEY, ...env });
+  return buildProviderChain({ GROQ_API_KEY: KEY, ...env });
 }
 
 function run(fetchImpl, extra = {}) {
@@ -71,52 +70,42 @@ function run(fetchImpl, extra = {}) {
 }
 
 describe("buildProviderChain", () => {
-  test("includes gemini and mistral when both keys are set", () => {
-    assert.deepEqual(chain().map((p) => p.id), ["gemini", "mistral"]);
+  test("uses one Groq key and defaults to GPT-OSS 120B", () => {
+    const providers = chain();
+    assert.equal(providers.length, 1);
+    const [groq] = providers;
+    assert.equal(groq.id, "groq");
+    assert.equal(groq.model, "openai/gpt-oss-120b");
+    assert.equal(groq.apiKey, KEY);
+    assert.equal(groq.maxTokens, 1024);
+    assert.deepEqual(groq.extraBody, { reasoning_effort: "low", include_reasoning: false });
   });
 
-  test("applies gemini and mistral defaults", () => {
-    const [gemini, mistral] = chain();
-    assert.equal(gemini.model, "gemini-3.8-flash");
-    assert.equal(gemini.extraBody.reasoning_effort, "minimal");
-    assert.equal(gemini.maxTokens, 512);
-    assert.equal(gemini.apiKey, KEY);
-    assert.equal(mistral.model, "mistral-small-latest");
-    assert.equal(mistral.maxTokens, 220);
-    assert.deepEqual(mistral.extraBody, {});
+  test("other providers' keys cannot enable another provider", () => {
+    const legacy = { GEMINI_API_KEY: KEY, MISTRAL_API_KEY: KEY, OPENROUTER_API_KEY: KEY };
+    assert.deepEqual(buildProviderChain(legacy), []);
+    assert.deepEqual(chain(legacy).map((p) => p.id), ["groq"]);
   });
 
-  test("empty GEMINI_REASONING_EFFORT omits reasoning_effort", () => {
-    const [gemini] = chain({ GEMINI_REASONING_EFFORT: "" });
-    assert.deepEqual(gemini.extraBody, {});
+  test("missing, empty and whitespace-only Groq keys are not configured", () => {
+    for (const key of [undefined, "", "   "]) {
+      assert.deepEqual(buildProviderChain({ GROQ_API_KEY: key }), []);
+    }
   });
 
-  test("GEMINI_MODEL overrides the model", () => {
-    const [gemini] = chain({ GEMINI_MODEL: "x" });
-    assert.equal(gemini.model, "x");
-  });
-
-  test("an empty-string key skips that provider", () => {
-    assert.deepEqual(chain({ GEMINI_API_KEY: "" }).map((p) => p.id), ["mistral"]);
-  });
-
-  test("optional groq is appended only when its key is set", () => {
-    assert.deepEqual(chain({ GROQ_API_KEY: KEY }).map((p) => p.id), ["gemini", "mistral", "groq"]);
-    const groq = chain({ GROQ_API_KEY: KEY })[2];
+  test("trims the key and supports a Groq model override", () => {
+    const [groq] = chain({ GROQ_API_KEY: ` ${KEY} `, GROQ_MODEL: "llama-3.3-70b-versatile" });
+    assert.equal(groq.apiKey, KEY);
     assert.equal(groq.model, "llama-3.3-70b-versatile");
-    assert.equal(groq.maxTokens, 220);
-  });
-
-  test("no keys gives an empty chain", () => {
-    assert.deepEqual(buildProviderChain({}), []);
+    assert.deepEqual(groq.extraBody, {});
   });
 });
 
 describe("callProvider request shape", () => {
   test("sends system prompt first, temperature, stream false and bearer auth", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: ok("Hello there.") });
-    const [gemini] = chain();
-    const result = await callProvider(gemini, MESSAGES, {
+    const fetchImpl = makeFetch({ [GROQ_HOST]: ok("Hello there.") });
+    const [groq] = chain();
+    const result = await callProvider(groq, MESSAGES, {
       fetchImpl,
       timeoutMs: 8000,
       systemPrompt: SYSTEM_PROMPT,
@@ -124,7 +113,7 @@ describe("callProvider request shape", () => {
     assert.deepEqual(result, { ok: true, text: "Hello there." });
     assert.equal(fetchImpl.calls.length, 1);
     const { url, init } = fetchImpl.calls[0];
-    assert.equal(url, gemini.url);
+    assert.equal(url, groq.url);
     assert.equal(init.method, "POST");
     assert.equal(init.headers.Authorization ?? init.headers.authorization, `Bearer ${KEY}`);
     assert.equal(init.headers["Content-Type"], "application/json");
@@ -135,13 +124,16 @@ describe("callProvider request shape", () => {
     assert.equal(body.temperature, LIMITS.TEMPERATURE);
     assert.equal(body.temperature, 0.95);
     assert.equal(body.stream, false);
-    assert.equal(body.model, gemini.model);
-    assert.equal(body.max_tokens, 512);
-    assert.equal(body.reasoning_effort, "minimal");
+    assert.equal(body.model, groq.model);
+    assert.equal(body.max_completion_tokens, 1024);
+    assert.equal(body.reasoning_effort, "low");
+    assert.equal(body.include_reasoning, false);
+    assert.equal(body.max_tokens, undefined);
+    assert.equal(body.reasoning_format, undefined);
   });
 
   test("returns the cleaned reply text", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: ok("**Hi** there.") });
+    const fetchImpl = makeFetch({ [GROQ_HOST]: ok("**Hi** there.") });
     const result = await callProvider(chain()[0], MESSAGES, {
       fetchImpl,
       timeoutMs: 8000,
@@ -156,14 +148,14 @@ describe("callProvider classification", () => {
 
   test("non-2xx in FATAL_UPSTREAM_STATUSES is non-retryable", async () => {
     for (const code of FATAL_UPSTREAM_STATUSES) {
-      const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GEMINI_HOST]: status(code) })));
+      const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GROQ_HOST]: status(code) })));
       assert.deepEqual(r, { ok: false, retryable: false, status: code, reason: "http" });
     }
   });
 
   test("every non-fatal non-2xx status is retryable (400, 401, 403, 429, 404, 402, 408, 5xx)", async () => {
     for (const code of [400, 401, 403, 429, 404, 402, 408, 500, 503]) {
-      const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GEMINI_HOST]: status(code) })));
+      const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GROQ_HOST]: status(code) })));
       assert.deepEqual(r, { ok: false, retryable: true, status: code, reason: "http" });
     }
   });
@@ -173,12 +165,12 @@ describe("callProvider classification", () => {
       new Promise((_, reject) => {
         init.signal.addEventListener("abort", () => reject(init.signal.reason));
       });
-    const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GEMINI_HOST]: hang })));
+    const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GROQ_HOST]: hang })));
     assert.deepEqual(r, { ok: false, retryable: true, status: null, reason: "timeout" });
   });
 
   test("other thrown errors are retryable network failures", async () => {
-    const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GEMINI_HOST]: new TypeError("boom") })));
+    const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GROQ_HOST]: new TypeError("boom") })));
     assert.deepEqual(r, { ok: false, retryable: true, status: null, reason: "network" });
   });
 
@@ -186,14 +178,14 @@ describe("callProvider classification", () => {
     const r = await callProvider(
       chain()[0],
       MESSAGES,
-      opts(makeFetch({ [GEMINI_HOST]: new Response("not json{", { status: 200 }) })),
+      opts(makeFetch({ [GROQ_HOST]: new Response("not json{", { status: 200 }) })),
     );
     assert.deepEqual(r, { ok: false, retryable: true, status: 200, reason: "bad_json" });
   });
 
   test("a never-ending response body is a retryable timeout", async () => {
     const fetchImpl = makeFetch({
-      [GEMINI_HOST]: () => new Response(new ReadableStream({ start() {} }), { status: 200 }),
+      [GROQ_HOST]: () => new Response(new ReadableStream({ start() {} }), { status: 200 }),
     });
     const started = Date.now();
     const r = await callProvider(chain()[0], MESSAGES, opts(fetchImpl));
@@ -207,14 +199,14 @@ describe("callProvider classification", () => {
         controller.error(new TypeError("terminated"));
       },
     });
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: () => new Response(stream, { status: 200 }) });
+    const fetchImpl = makeFetch({ [GROQ_HOST]: () => new Response(stream, { status: 200 }) });
     const r = await callProvider(chain()[0], MESSAGES, opts(fetchImpl));
     assert.deepEqual(r, { ok: false, retryable: true, status: null, reason: "network" });
   });
 
   test("requests use redirect: error and a redirect rejection falls through as network", async () => {
     // fetch with redirect: "error" rejects with a TypeError when the server redirects.
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: new TypeError("fetch failed") });
+    const fetchImpl = makeFetch({ [GROQ_HOST]: new TypeError("fetch failed") });
     const r = await callProvider(chain()[0], MESSAGES, opts(fetchImpl));
     assert.deepEqual(r, { ok: false, retryable: true, status: null, reason: "network" });
     assert.equal(fetchImpl.calls[0].init.redirect, "error");
@@ -222,7 +214,7 @@ describe("callProvider classification", () => {
 
   test("history is copied to fresh { role, content } objects without extra keys", async () => {
     const input = [{ role: "user", content: USER_TEXT, extra: "leak-me" }];
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: ok("Fine.") });
+    const fetchImpl = makeFetch({ [GROQ_HOST]: ok("Fine.") });
     await callProvider(chain()[0], input, opts(fetchImpl));
     const body = JSON.parse(fetchImpl.calls[0].init.body);
     assert.deepEqual(body.messages[1], { role: "user", content: USER_TEXT });
@@ -231,200 +223,80 @@ describe("callProvider classification", () => {
 
   test("empty, null, whitespace-only and markup-only content is empty", async () => {
     for (const content of ["", null, "   \n ", "```", 42]) {
-      const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GEMINI_HOST]: ok(content) })));
+      const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GROQ_HOST]: ok(content) })));
       assert.deepEqual(r, { ok: false, retryable: true, status: 200, reason: "empty" }, String(content));
     }
   });
 
   test("missing choices is empty", async () => {
     const res = new Response(JSON.stringify({}), { status: 200 });
-    const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GEMINI_HOST]: res })));
+    const r = await callProvider(chain()[0], MESSAGES, opts(makeFetch({ [GROQ_HOST]: res })));
     assert.equal(r.reason, "empty");
   });
 });
 
-describe("runProviderChain fall-through matrix", () => {
-  const mistralOk = () => ok(REPLY_TEXT);
-
-  const fallThrough = {
-    "429": () => status(429),
-    "503": () => status(503),
-    "404": () => status(404),
-    "400 (human-approved override)": () => status(400),
-    "401 (human-approved override)": () => status(401),
-    "403 (human-approved override)": () => status(403),
-    "thrown TypeError": () => new TypeError("fetch failed"),
-    "200 invalid JSON": () => new Response("<html>", { status: 200 }),
-    "200 empty content": () => ok(""),
-    "200 null content": () => ok(null),
-  };
-
-  for (const [label, gemini] of Object.entries(fallThrough)) {
-    test(`gemini ${label} falls through to mistral`, async () => {
-      const fetchImpl = makeFetch({ [GEMINI_HOST]: gemini, [MISTRAL_HOST]: mistralOk });
-      const r = await run(fetchImpl);
-      assert.deepEqual(r, { ok: true, text: REPLY_TEXT, source: "mistral" });
-      assert.equal(fetchImpl.calls.length, 2);
-    });
-  }
-
-  test("gemini timeout falls through to mistral", async () => {
-    const hang = (url, init) =>
-      new Promise((_, reject) => {
-        init.signal.addEventListener("abort", () => reject(init.signal.reason));
-      });
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: hang, [MISTRAL_HOST]: mistralOk });
-    const r = await run(fetchImpl, { limits: { ...LIMITS, PROVIDER_TIMEOUT_MS: 50 } });
-    assert.deepEqual(r, { ok: true, text: REPLY_TEXT, source: "mistral" });
-  });
-
-  test("gemini success returns source gemini without calling mistral", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: ok("Gemini reply."), [MISTRAL_HOST]: mistralOk });
-    const r = await run(fetchImpl);
-    assert.deepEqual(r, { ok: true, text: "Gemini reply.", source: "gemini" });
-    assert.equal(fetchImpl.calls.length, 1);
-  });
-
-  test("fatal statuses come from FATAL_UPSTREAM_STATUSES (422 only)", () => {
-    assert.deepEqual([...FATAL_UPSTREAM_STATUSES], [422]);
-  });
-
-  for (const code of FATAL_UPSTREAM_STATUSES) {
-    test(`gemini ${code} is fatal and mistral is never called`, async () => {
-      const fetchImpl = makeFetch({ [GEMINI_HOST]: status(code), [MISTRAL_HOST]: mistralOk });
-      const r = await run(fetchImpl);
-      assert.deepEqual(r, { ok: false, fatal: true });
+describe("runProviderChain with Groq only", () => {
+  for (const code of [400, 401, 403, 404, 429, 500, 503]) {
+    test(`Groq ${code} makes one attempt and uses the canned fallback`, async () => {
+      const fetchImpl = makeFetch({ [GROQ_HOST]: status(code) });
+      assert.deepEqual(await run(fetchImpl), { ok: false, fatal: false });
       assert.equal(fetchImpl.calls.length, 1);
     });
   }
 
-  test("mistral 422 after gemini fall-through is fatal", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: status(503), [MISTRAL_HOST]: status(422) });
-    assert.deepEqual(await run(fetchImpl), { ok: false, fatal: true });
-  });
-
-  test("all providers 400 is all-failed, not upstream-rejected", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: status(400), [MISTRAL_HOST]: status(400) });
-    assert.deepEqual(await run(fetchImpl), { ok: false, fatal: false });
-    assert.equal(fetchImpl.calls.length, 2);
-  });
-
-  test("gemini 503 and mistral 503 exhausts the chain (not fatal)", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: status(503), [MISTRAL_HOST]: status(503) });
-    assert.deepEqual(await run(fetchImpl), { ok: false, fatal: false });
-  });
-
-  test("all providers 401 is all-failed, not upstream-rejected", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: status(401), [MISTRAL_HOST]: status(401) });
-    assert.deepEqual(await run(fetchImpl), { ok: false, fatal: false });
-    assert.equal(fetchImpl.calls.length, 2);
-  });
-
-  test("all providers 403 is all-failed, not upstream-rejected", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: status(403), [MISTRAL_HOST]: status(403) });
-    assert.deepEqual(await run(fetchImpl), { ok: false, fatal: false });
-  });
-
-  test("an empty chain returns not fatal and makes no calls", async () => {
-    const fetchImpl = makeFetch({});
-    const r = await runProviderChain([], MESSAGES, {
-      fetchImpl,
-      systemPrompt: SYSTEM_PROMPT,
-      logger: makeLogger(),
-    });
-    assert.deepEqual(r, { ok: false, fatal: false });
-    assert.equal(fetchImpl.calls.length, 0);
-  });
-
-  test("groq is tried third when the first two fail", async () => {
-    const fetchImpl = makeFetch({
-      [GEMINI_HOST]: status(503),
-      [MISTRAL_HOST]: status(401),
-      "api.groq.com": ok("Groq here."),
-    });
-    const r = await runProviderChain(chain({ GROQ_API_KEY: KEY }), MESSAGES, {
-      fetchImpl,
-      systemPrompt: SYSTEM_PROMPT,
-      logger: makeLogger(),
-    });
-    assert.deepEqual(r, { ok: true, text: "Groq here.", source: "groq" });
-  });
-});
-
-describe("runProviderChain budget", () => {
-  test("stops when the remaining budget is under the minimum", async () => {
-    let t = 1_000_000;
-    const fetchImpl = makeFetch({
-      [GEMINI_HOST]: () => {
-        t += 18_000;
-        return status(503);
-      },
-      [MISTRAL_HOST]: ok(REPLY_TEXT),
-    });
-    const r = await run(fetchImpl, { now: () => t });
-    assert.deepEqual(r, { ok: false, fatal: false });
+  test("success returns source groq", async () => {
+    const fetchImpl = makeFetch({ [GROQ_HOST]: ok(REPLY_TEXT) });
+    assert.deepEqual(await run(fetchImpl), { ok: true, text: REPLY_TEXT, source: "groq" });
     assert.equal(fetchImpl.calls.length, 1);
   });
 
-  test("still calls the next provider when remaining budget is above the minimum", async () => {
-    let t = 0;
-    const fetchImpl = makeFetch({
-      [GEMINI_HOST]: () => {
-        t += 15_000; // remaining 5,000 >= 2,500
-        return status(503);
-      },
-      [MISTRAL_HOST]: ok(REPLY_TEXT),
-    });
-    const r = await run(fetchImpl, { now: () => t });
-    assert.equal(r.source, "mistral");
-    assert.equal(fetchImpl.calls.length, 2);
-  });
-});
-
-describe("runProviderChain logging", () => {
-  test("logs exactly one {provider,status,reason,ms} per attempt", async () => {
-    const logger = makeLogger();
-    let t = 0;
-    const fetchImpl = makeFetch({
-      [GEMINI_HOST]: () => {
-        t += 120;
-        return status(401);
-      },
-      [MISTRAL_HOST]: () => {
-        t += 80;
-        return ok(REPLY_TEXT);
-      },
-    });
-    await run(fetchImpl, { logger, now: () => t });
-    assert.equal(logger.entries.length, 2);
-    assert.deepEqual(logger.entries[0], ["warn", { provider: "gemini", status: 401, reason: "http", ms: 120 }]);
-    assert.deepEqual(logger.entries[1], ["info", { provider: "mistral", status: 200, reason: "ok", ms: 80 }]);
+  test("422 is fatal without another call", async () => {
+    const fetchImpl = makeFetch({ [GROQ_HOST]: status(422) });
+    assert.deepEqual(await run(fetchImpl), { ok: false, fatal: true });
+    assert.equal(fetchImpl.calls.length, 1);
   });
 
-  test("log output never contains the key, user text, reply text or upstream body", async () => {
+  test("an empty chain makes no calls", async () => {
+    const fetchImpl = makeFetch({});
+    assert.deepEqual(await runProviderChain([], MESSAGES, {
+      fetchImpl, systemPrompt: SYSTEM_PROMPT, logger: makeLogger(),
+    }), { ok: false, fatal: false });
+    assert.equal(fetchImpl.calls.length, 0);
+  });
+
+  test("does not call Groq after the total time budget is exhausted", async () => {
+    const fetchImpl = makeFetch({ [GROQ_HOST]: ok(REPLY_TEXT) });
+    let t = 0;
+    const now = () => { const value = t; t += LIMITS.TOTAL_BUDGET_MS; return value; };
+    assert.deepEqual(await run(fetchImpl, { now }), { ok: false, fatal: false });
+    assert.equal(fetchImpl.calls.length, 0);
+  });
+
+  test("only final content is returned, never the reasoning field", async () => {
+    const response = new Response(JSON.stringify({ choices: [{ message: {
+      content: REPLY_TEXT, reasoning: "private-reasoning-fixture",
+    } }] }));
+    assert.deepEqual(await run(makeFetch({ [GROQ_HOST]: response })), {
+      ok: true, text: REPLY_TEXT, source: "groq",
+    });
+  });
+
+  test("logs only provider, status, reason and duration", async () => {
     const logger = makeLogger();
-    const scenarios = [
-      { [GEMINI_HOST]: status(401), [MISTRAL_HOST]: ok(REPLY_TEXT) },
-      { [GEMINI_HOST]: new TypeError(`fetch failed ${KEY}`), [MISTRAL_HOST]: status(400) },
-      { [GEMINI_HOST]: ok(""), [MISTRAL_HOST]: new Response("{bad", { status: 200 }) },
-    ];
-    for (const script of scenarios) {
-      await run(makeFetch(script), { logger });
+    for (const response of [status(401), ok(REPLY_TEXT), new TypeError(`failed ${KEY}`)]) {
+      const fetchImpl = makeFetch({ [GROQ_HOST]: response });
+      await run(fetchImpl, { logger });
     }
+    assert.equal(logger.entries.length, 3);
+    assert.deepEqual(logger.entries.map(([level]) => level), ["warn", "info", "warn"]);
     const dump = JSON.stringify(logger.entries);
     for (const forbidden of [KEY, USER_TEXT, REPLY_TEXT, SYSTEM_PROMPT, "upstream-body-should-not-leak"]) {
-      assert.ok(!dump.includes(forbidden), `log leaked: ${forbidden}`);
+      assert.ok(!dump.includes(forbidden));
     }
     for (const [, entry] of logger.entries) {
       assert.deepEqual(Object.keys(entry).sort(), ["ms", "provider", "reason", "status"]);
+      assert.equal(entry.provider, "groq");
     }
-  });
-
-  test("failure results never carry the key, body or message text", async () => {
-    const fetchImpl = makeFetch({ [GEMINI_HOST]: status(422) });
-    const r = await run(fetchImpl);
-    const dump = JSON.stringify(r);
-    assert.ok(!dump.includes(KEY) && !dump.includes(USER_TEXT));
   });
 });
 

@@ -298,25 +298,25 @@ describe(".env.local loading (Node's process.loadEnvFile)", () => {
   });
 
   test("values are never printed or returned", () => {
-    withEnvFile(`GEMINI_API_KEY=${SECRET_VALUE}\n`, ["GEMINI_API_KEY"], (file) => {
-      delete process.env.GEMINI_API_KEY;
+    withEnvFile(`GROQ_API_KEY=${SECRET_VALUE}\n`, ["GROQ_API_KEY"], (file) => {
+      delete process.env.GROQ_API_KEY;
       const { result, lines } = captureConsole(() => {
         const r = loadEnvLocal(file);
         return { r, desc: describeProviderKeys(process.env) };
       });
       assert.ok(!JSON.stringify(result).includes(SECRET_VALUE));
       assert.ok(!lines.join("\n").includes(SECRET_VALUE));
-      assert.match(result.desc, /gemini: yes/);
+      assert.match(result.desc, /groq: yes/);
     });
   });
 });
 
 describe("describeProviderKeys", () => {
   test("reports only yes/no per provider", () => {
-    assert.equal(describeProviderKeys({}), "gemini: no, mistral: no, groq: no");
+    assert.equal(describeProviderKeys({}), "groq: no");
     assert.equal(
-      describeProviderKeys({ GEMINI_API_KEY: SECRET_VALUE, MISTRAL_API_KEY: "", GROQ_API_KEY: SECRET_VALUE }),
-      "gemini: yes, mistral: no, groq: yes",
+      describeProviderKeys({ GROQ_API_KEY: SECRET_VALUE }),
+      "groq: yes",
     );
   });
 });
@@ -325,9 +325,9 @@ describe("createMockFetch", () => {
   const call = (fetchImpl, id, init = {}) =>
     fetchImpl(PROVIDERS[id].url, { method: "POST", headers: {}, body: "{}", ...init });
 
-  test("ok: gemini answers 200 with an OpenAI-shaped, witty reply", async () => {
+  test("ok: groq answers 200 with an OpenAI-shaped, witty reply", async () => {
     const f = createMockFetch("ok", { delayMs: 0 });
-    const res = await call(f, "gemini");
+    const res = await call(f, "groq");
     assert.equal(res.status, 200);
     const data = await res.json();
     const text = data.choices[0].message.content;
@@ -335,39 +335,32 @@ describe("createMockFetch", () => {
     assert.ok(text.length > 20);
   });
 
-  test("ok: other providers also answer (never the network)", async () => {
-    const f = createMockFetch("ok", { delayMs: 0 });
-    assert.equal((await call(f, "mistral")).status, 200);
-    assert.equal((await call(f, "groq")).status, 200);
-  });
-
   test("fatal: first provider gives 422", async () => {
     const f = createMockFetch("fatal", { delayMs: 0 });
-    assert.equal((await call(f, "gemini")).status, 422);
+    assert.equal((await call(f, "groq")).status, 422);
   });
 
-  test("fallthrough: gemini 401, mistral 200", async () => {
-    const f = createMockFetch("fallthrough", { delayMs: 0 });
-    assert.equal((await call(f, "gemini")).status, 401);
-    assert.equal((await call(f, "mistral")).status, 200);
+  test("unauthorized: Groq gives 401", async () => {
+    const f = createMockFetch("unauthorized", { delayMs: 0 });
+    assert.equal((await call(f, "groq")).status, 401);
   });
 
   test("down and fail: every provider gives 503", async () => {
     for (const mode of ["down", "fail"]) {
       const f = createMockFetch(mode, { delayMs: 0 });
-      for (const id of ["gemini", "mistral", "groq"]) assert.equal((await call(f, id)).status, 503, `${mode}/${id}`);
+      for (const id of ["groq"]) assert.equal((await call(f, id)).status, 503, `${mode}/${id}`);
     }
   });
 
   test("ratelimit behaves like ok", async () => {
     const f = createMockFetch("ratelimit", { delayMs: 0 });
-    assert.equal((await call(f, "gemini")).status, 200);
+    assert.equal((await call(f, "groq")).status, 200);
   });
 
   test("slow: delays, then succeeds", async () => {
     const f = createMockFetch("slow", { delayMs: 60 });
     const start = Date.now();
-    const res = await call(f, "gemini");
+    const res = await call(f, "groq");
     assert.equal(res.status, 200);
     assert.ok(Date.now() - start >= 50);
   });
@@ -380,7 +373,7 @@ describe("createMockFetch", () => {
   test("delay honours abort and leaves no timer behind", async () => {
     const f = createMockFetch("slow", { delayMs: 60_000 });
     const ctl = new AbortController();
-    const p = call(f, "gemini", { signal: ctl.signal });
+    const p = call(f, "groq", { signal: ctl.signal });
     setTimeout(() => ctl.abort(), 10);
     await assert.rejects(p, (err) => err.name === "AbortError");
   });
@@ -518,12 +511,12 @@ describe("integration: server on an ephemeral port", () => {
     });
   });
 
-  test("POST /api/chat in mock mode 'ok' returns gemini", async () => {
+  test("POST /api/chat in mock mode 'ok' returns groq", async () => {
     await chatServer("ok", async (_srv, origin) => {
       const res = await post(origin);
       assert.equal(res.status, 200);
       const data = await res.json();
-      assert.equal(data.source, "gemini");
+      assert.equal(data.source, "groq");
       assert.equal(typeof data.reply, "string");
       assert.ok(data.reply.length > 0);
     });
@@ -537,11 +530,11 @@ describe("integration: server on an ephemeral port", () => {
     });
   });
 
-  test("mock 'fallthrough' -> mistral answers", async () => {
-    await chatServer("fallthrough", async (_s, origin) => {
+  test("mock 'unauthorized' -> canned fallback", async () => {
+    await chatServer("unauthorized", async (_s, origin) => {
       const res = await post(origin);
       assert.equal(res.status, 200);
-      assert.equal((await res.json()).source, "mistral");
+      assert.equal((await res.json()).source, "fallback");
     });
   });
 
@@ -638,8 +631,6 @@ describe("integration: server on an ephemeral port", () => {
   test("mock env carries fake keys only, even when real-looking keys are in the given env", async () => {
     const holder = {
       ALLOWED_ORIGINS: "",
-      GEMINI_API_KEY: SECRET_VALUE,
-      MISTRAL_API_KEY: SECRET_VALUE,
       GROQ_API_KEY: SECRET_VALUE,
     };
     const seen = [];

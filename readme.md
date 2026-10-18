@@ -40,7 +40,7 @@ This is the personal portfolio of **Shahriar Islam Dip** — a Computer Science 
 | **Full Accessibility** | Semantic HTML, ARIA attributes, keyboard navigation, focus management, reduced-motion support, skip links |
 | **No-JS Fallbacks** | All critical content readable without JavaScript via `<noscript>` blocks |
 | **Custom Cursor** | Context-aware cursor with labeled states (OPEN, EXPLORE, SCROLL, REVEAL, FILTER, STEP, CONTACT, CLOSE, PREV, NEXT, TOP, COPY, CONNECT, MENU) |
-| **SID.agent Chat** | AI chat widget answering visitor questions through one Vercel serverless function, with Gemini, Mistral and Groq fallbacks; provider keys stay server-side |
+| **SID.agent Chat** | AI chat widget answering visitor questions through one Vercel serverless function, using Groq GPT-OSS 120B with one server-side API key |
 
 ---
 
@@ -55,7 +55,7 @@ This is the personal portfolio of **Shahriar Islam Dip** — a Computer Science 
 | **Architecture** | Single-page, modular CSS/JS, data-attribute hooks, zero build step |
 | **Performance** | Preloaded hero assets, lazy-loaded images, `decoding="async"`, resource hints |
 | **Accessibility** | WCAG 2.1 AA target, semantic landmarks, live regions, focus trapping in dialogs |
-| **AI chat** | Vercel Function (Node 24), Gemini, then Mistral, then Groq fallback |
+| **AI chat** | Vercel Function (Node 24), Groq (`openai/gpt-oss-120b`) |
 
 ---
 
@@ -369,53 +369,44 @@ The portfolio respects `@media (prefers-reduced-motion: reduce)`:
 
 ## 🤖 SID.agent (AI portfolio chat)
 
-SID.agent is the chat widget on the site. It answers visitors' questions about Shahriar's work using free-tier LLM APIs, called from a Vercel serverless function at `/api/chat`. Provider keys live only in Vercel environment variables and in your local `.env.local`. They never reach the browser or git.
+SID.agent is the chat widget on the site. It answers visitors' questions about Shahriar's work using Groq's free-tier API with `openai/gpt-oss-120b`, called from a Vercel serverless function at `/api/chat`. The single `GROQ_API_KEY` lives only in Vercel environment variables and in your local `.env.local`. It never reaches the browser or git.
 
 ### Architecture
 - **Widget:** `index.html`, `script.js`, `style.css`, with the avatar at `images/agent-avatar.svg` (an illustrated portrait of Shahriar Islam Dip)
 - **Endpoint:** `api/chat.js` and the modules in `api/_lib/` (`handler.js`, `providers.js`, `origin.js`, `rate-limit.js`, `validate.js`, `respond.js`, `persona.js`, `config.js`)
-- **Provider order:** Gemini, then Mistral, then Groq (Groq is skipped unless `GROQ_API_KEY` is set)
-- **Fallback:** a provider that returns 400, 401, 403, 404, 429 or a 5xx, times out, or returns an empty or unparseable reply hands the request to the next provider. Only HTTP 422 stops the chain, which returns `502 upstream_rejected`. If every provider fails, the visitor gets a friendly canned reply. If no key is configured at all, the endpoint returns `503 not_configured`.
+- **Provider:** Groq only, using one `GROQ_API_KEY` and the `openai/gpt-oss-120b` model. Other providers' keys are ignored.
+- **Generation:** low reasoning effort, `include_reasoning: false`, and a 1,024-token completion budget shared by reasoning and the final answer. Visible replies stay capped at 700 characters.
+- **Fallback:** one attempt per message, without automatic retries or alternate providers. HTTP 422 returns `502 upstream_rejected`. Other upstream failures (including quota exhaustion, authentication errors, timeouts, empty replies and invalid JSON) return a friendly canned reply. Without a Groq key, the endpoint returns `503 not_configured`.
 
 ### Environment Variables
 
 | Name | Required | Default | Notes |
 |---|---|---|---|
-| `GEMINI_API_KEY` | yes | none | Google AI Studio key (primary) |
-| `MISTRAL_API_KEY` | yes | none | Mistral console key (fallback 1) |
-| `GROQ_API_KEY` | optional | none | Groq console key (fallback 2); the provider is skipped if unset |
-| `GEMINI_MODEL` | no | `gemini-3.8-flash` | current stable Flash model; override it if it is retired |
-| `GEMINI_REASONING_EFFORT` | no | `minimal` | sent as `reasoning_effort`; set to the empty string to omit it |
-| `MISTRAL_MODEL` | no | `mistral-small-latest` | alias, survives version bumps |
-| `GROQ_MODEL` | no | `llama-3.3-70b-versatile` | a Groq production model |
+| `GROQ_API_KEY` | yes | none | One Groq console key, server-side only |
+| `GROQ_MODEL` | no | `openai/gpt-oss-120b` | Optional Groq model override |
 | `ALLOWED_ORIGINS` | yes in production | none | comma-separated exact origins, e.g. `https://example.com,https://www.example.com`. Use lowercase, include the scheme, no path. List both apex and `www` if both serve the site. A mismatch makes real visitors get the "forbidden" reply. |
 | `VERCEL_ENV`, `VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL` | automatic | | Vercel system variables. "Automatically expose System Environment Variables" must stay enabled. |
 
-At least one provider key is needed. Set all three keys if you want the fallback chain.
+Only one API key is needed. Create it in the [Groq console](https://console.groq.com/keys) and keep your Groq account on the Free plan; the API key itself does not select a billing plan.
 
-### Getting Free Keys
-- **Gemini:** Google AI Studio (`aistudio.google.com/app/apikey`)
-- **Mistral:** Mistral console (`console.mistral.ai/api-keys`)
-- **Groq:** Groq console (`console.groq.com/keys`)
-
-Free-tier limits and model names change. Check each provider's page before relying on them. Never paste a key into the repo, a commit message or an issue.
+Groq currently lists free limits for `openai/gpt-oss-120b` of 30 requests/minute, 1,000 requests/day, 8,000 tokens/minute and 200,000 tokens/day. Any one limit can stop requests. Quotas apply across the organization, and the exact limits for your account are shown in [Groq settings](https://console.groq.com/settings/limits). See [Groq's rate-limit documentation](https://console.groq.com/docs/rate-limits) (checked October 18, 2026).
 
 ### Adding Keys in Vercel
 1. Open the project on Vercel, then go to **Settings**, then **Environment Variables**.
-2. Add each key for **Production** and **Preview**.
+2. Add `GROQ_API_KEY` for **Production** and **Preview**. Remove any stale `GROQ_MODEL` override or set it to `openai/gpt-oss-120b`.
 3. Set `ALLOWED_ORIGINS` for **Production**.
 4. Redeploy so the new variables take effect.
 
 These variables must stay server-side. Do not give them a public prefix (such as `NEXT_PUBLIC_`), and do not reference them in client code.
 
 ### Local Development
-- **With real providers:** copy `.env.example` to `.env.local` (git-ignored), add your keys, then run `npm run dev`. The dev server reads `.env.local` when it starts, so restart it after editing.
+- **With Groq:** copy `.env.example` to `.env.local` (git-ignored), add your `GROQ_API_KEY`, then run `npm run dev`. The dev server reads `.env.local` when it starts, so restart it after editing.
 - **Without keys:** run `npm run dev:mock`. It uses fake keys and makes no network calls. Pick another mock mode with `node scripts/dev-server.js --mock=<mode>`:
   - `ok` (default): canned replies after a short delay
   - `slow`: a longer delay
-  - `fatal`: Gemini returns 422, so the endpoint answers 502
-  - `fallthrough`: Gemini returns 401, and Mistral answers
-  - `down` or `fail`: every provider returns 503, so the visitor gets a canned reply
+  - `fatal`: Groq returns 422, so the endpoint answers 502
+  - `unauthorized`: Groq returns 401, so the visitor gets a canned reply
+  - `down` or `fail`: Groq returns 503, so the visitor gets a canned reply
   - `ratelimit`: mock providers with the real rate limiter
 - **With Vercel's runtime:** after `vercel link` and `vercel env pull .env.local`, `npx vercel dev` runs the function the way Vercel does.
 - **Port 3000:** the dev server runs at `http://localhost:3000` (use `--port N` or the `PORT` variable to change it). The chat origin allowlist only covers port 3000. On another port, add `ALLOWED_ORIGINS=http://localhost:<port>` (the dev server prints this hint).
@@ -424,7 +415,7 @@ These variables must stay server-side. Do not give them a public prefix (such as
 Run `npm test`. It uses Node's built-in test runner (`node:test`) over `tests/**/*.test.js`, and it makes no network calls.
 
 ### Rate Limits and Limitations
-> Best effort: state lives in one warm function instance. It resets on cold start and is not shared across concurrent instances. The real ceiling is the providers' own free-tier quotas.
+> Best effort: state lives in one warm function instance. It resets on cold start and is not shared across concurrent instances. The real ceiling is Groq's own free-tier quotas.
 
 The Origin check stops other websites from calling the endpoint from a browser. It does not stop scripts or `curl`, which can send any Origin header.
 
@@ -445,11 +436,11 @@ Follow the steps in [Adding Keys in Vercel](#adding-keys-in-vercel), then check 
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `503 not_configured` | No provider key is set in this environment | Add at least one key in Vercel (Production and/or Preview), or in `.env.local`, then redeploy or restart |
+| `503 not_configured` | No Groq key is set in this environment | Add `GROQ_API_KEY` in Vercel (Production and/or Preview), or in `.env.local`, then redeploy or restart |
 | `403 forbidden_origin` (the visitor sees the "forbidden" reply) | The site's origin is not in `ALLOWED_ORIGINS`. Check the scheme, `www` versus apex, trailing paths and letter case | Set the exact origin in `ALLOWED_ORIGINS`, then redeploy |
-| Repeated canned replies | Every provider is failing: free-tier quota used up, bad keys, or a retired model name | Check each provider's usage and key status, then check the model variables below |
-| `502 upstream_rejected` | A provider answered HTTP 422, which stops the chain and is never retried | Check the model names and `GEMINI_REASONING_EFFORT`, then check the provider's status page |
-| Model name changed or retired | The provider removed or renamed a model | Set `GEMINI_MODEL`, `MISTRAL_MODEL` or `GROQ_MODEL` to a current model name in Vercel, then redeploy |
+| Repeated canned replies | Groq is failing: free-tier quota used up, an invalid key, or a retired model name | Check Groq usage and key status, then check the model variables below |
+| `502 upstream_rejected` | Groq answered HTTP 422 | Check `GROQ_MODEL` and request settings, then check Groq status |
+| Model name changed or retired | The provider removed or renamed a model | Set `GROQ_MODEL` to a current model name in Vercel, then redeploy |
 
 ---
 

@@ -1,7 +1,7 @@
 /**
  * Local dev server: serves the static site and routes /api/chat to the real handler.
  *
- *   node scripts/dev-server.js                 real providers, keys from .env.local
+ *   node scripts/dev-server.js                 Groq, key from .env.local
  *   node scripts/dev-server.js --mock[=mode]   no keys, no network (see MOCK_MODES)
  *   node scripts/dev-server.js --port 4000     default 3000 (also PORT env)
  *
@@ -144,7 +144,7 @@ export function loadEnvLocal(file) {
 }
 
 /**
- * "gemini: yes, mistral: no, groq: no". Presence only, never a value.
+ * "groq: yes". Presence only, never a value.
  * @param {Record<string, string | undefined>} env
  * @returns {string}
  */
@@ -161,18 +161,16 @@ export function describeProviderKeys(env) {
  * canned reply). delayMs is applied before every answer.
  */
 export const MOCK_MODES = Object.freeze({
-  ok: { delayMs: 600, statuses: { gemini: 200, mistral: 200, groq: 200 } },
-  slow: { delayMs: 3000, statuses: { gemini: 200, mistral: 200, groq: 200 } },
-  fatal: { delayMs: 0, statuses: { gemini: 422, mistral: 200, groq: 200 } },
-  fallthrough: { delayMs: 0, statuses: { gemini: 401, mistral: 200, groq: 200 } },
-  down: { delayMs: 0, statuses: { gemini: 503, mistral: 503, groq: 503 } },
-  fail: { delayMs: 0, statuses: { gemini: 503, mistral: 503, groq: 503 } },
-  ratelimit: { delayMs: 600, statuses: { gemini: 200, mistral: 200, groq: 200 } },
+  ok: { delayMs: 600, statuses: { groq: 200 } },
+  slow: { delayMs: 3000, statuses: { groq: 200 } },
+  fatal: { delayMs: 0, statuses: { groq: 422 } },
+  unauthorized: { delayMs: 0, statuses: { groq: 401 } },
+  down: { delayMs: 0, statuses: { groq: 503 } },
+  fail: { delayMs: 0, statuses: { groq: 503 } },
+  ratelimit: { delayMs: 600, statuses: { groq: 200 } },
 });
 
 const MOCK_REPLIES = Object.freeze({
-  gemini: "Mock reply from gemini. Shahriar would like you to know this joke is load-tested.",
-  mistral: "Mock reply from mistral. Shahriar's fallback plan has a fallback plan, and it also ships.",
   groq: "Mock reply from groq. Shahriar writes code fast, but this reply was faster and has no bugs.",
 });
 

@@ -1,5 +1,7 @@
 # AI Portfolio Agent ("SID.agent") Implementation Plan
 
+> **Current configuration (October 18, 2026):** SID.agent now uses only Groq, one `GROQ_API_KEY`, and `openai/gpt-oss-120b`. The multi-provider setup below is historical and superseded by `api/_lib/config.js` and `readme.md`.
+
 > **Note:** This plan is a historical working document. The code and `readme.md` are the source of truth. The following later rulings supersede the text below:
 > - **(a)** Only HTTP 422 from a provider is fatal. 400/401/403/429/404/5xx, timeouts, and empty or unparseable replies fall through to the next provider; if all providers fail, a canned 200 reply is returned.
 > - **(b)** The chat log is a `<div role="log">` with `<div>` messages, not `<ol>`/`<li>`.

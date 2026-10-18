@@ -17,8 +17,8 @@ test("LIMITS is frozen", () => {
   assert.equal(Object.isFrozen(LIMITS), true);
 });
 
-test("PROVIDER_ORDER is gemini, mistral, groq", () => {
-  assert.deepEqual([...PROVIDER_ORDER], ["gemini", "mistral", "groq"]);
+test("Groq is the only provider", () => {
+  assert.deepEqual([...PROVIDER_ORDER], ["groq"]);
 });
 
 test("every provider URL is https", () => {
@@ -27,6 +27,6 @@ test("every provider URL is https", () => {
   }
 });
 
-test("FATAL_UPSTREAM_STATUSES is only 422 (400, 401 and 403 fall through)", () => {
+test("FATAL_UPSTREAM_STATUSES is only 422 (other failures use the canned reply)", () => {
   assert.deepEqual([...FATAL_UPSTREAM_STATUSES], [422]);
 });

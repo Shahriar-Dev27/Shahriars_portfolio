@@ -9,7 +9,7 @@ import { LIMITS } from "../api/_lib/config.js";
 const FAKE_KEY = "test-key-not-real";
 const ORIGIN = "http://localhost:3000";
 const URL_ = `${ORIGIN}/api/chat`;
-const BOTH_KEYS = { GEMINI_API_KEY: FAKE_KEY, MISTRAL_API_KEY: FAKE_KEY };
+const GROQ_KEY = { GROQ_API_KEY: FAKE_KEY };
 
 const USER_TEXT = "zebra-quokka-secret-question";
 const CLIENT_IP = "203.0.113.77";
@@ -53,16 +53,14 @@ function fakeFetch(byHost) {
   return fn;
 }
 
-const GEMINI = "generativelanguage.googleapis.com";
-const MISTRAL = "api.mistral.ai";
 const GROQ = "api.groq.com";
 
 function setup(overrides = {}) {
   const logger = overrides.logger ?? silentLogger();
-  const fetchImpl = overrides.fetchImpl ?? fakeFetch({ [GEMINI]: () => okResponse("Gemini says hi.") });
+  const fetchImpl = overrides.fetchImpl ?? fakeFetch({ [GROQ]: () => okResponse("Groq says hi.") });
   const limiter =
     overrides.limiter ?? createRateLimiter({ rules: [{ windowMs: 60_000, max: 100 }] });
-  const env = overrides.env ?? BOTH_KEYS;
+  const env = overrides.env ?? GROQ_KEY;
   const handler = createHandler({ env, fetchImpl, limiter, logger, random: () => 0 });
   return { handler, logger, fetchImpl, limiter, env };
 }
@@ -134,7 +132,7 @@ test("missing Origin -> 403 forbidden_origin", async () => {
 });
 
 test("the injected env is what isAllowedRequest sees", async () => {
-  const env = { ...BOTH_KEYS, VERCEL_ENV: "production", ALLOWED_ORIGINS: "https://example.com" };
+  const env = { ...GROQ_KEY, VERCEL_ENV: "production", ALLOWED_ORIGINS: "https://example.com" };
   const { handler } = setup({ env });
   // localhost is only allowed when VERCEL_ENV is unset/development, so the default process.env would allow it.
   const denied = await handler(makeRequest());
@@ -309,13 +307,13 @@ test("no provider keys -> 503 not_configured, chain never called, error logged w
 });
 
 test("empty-string keys count as not configured", async () => {
-  const { handler } = setup({ env: { GEMINI_API_KEY: "", MISTRAL_API_KEY: "" } });
+  const { handler } = setup({ env: { GROQ_API_KEY: "" } });
   const res = await handler(makeRequest());
   assert.equal(res.status, 503);
 });
 
-test("success: Gemini 200 -> {reply, source:gemini} with cleaned text", async () => {
-  const fetchImpl = fakeFetch({ [GEMINI]: () => okResponse("**Bold** move, `friend`.\n\n\n\n- Done.") });
+test("success: Groq 200 -> {reply, source:groq} with cleaned text", async () => {
+  const fetchImpl = fakeFetch({ [GROQ]: () => okResponse("**Bold** move, `friend`.\n\n\n\n- Done.") });
   const { handler } = setup({ fetchImpl });
   const res = await handler(makeRequest());
   assert.equal(res.status, 200);
@@ -323,77 +321,36 @@ test("success: Gemini 200 -> {reply, source:gemini} with cleaned text", async ()
   assertNoCors(res);
   const json = await res.json();
   assert.deepEqual(Object.keys(json).sort(), ["reply", "source"]);
-  assert.equal(json.source, "gemini");
+  assert.equal(json.source, "groq");
   assert.equal(json.reply, "Bold move, friend.\n\nDone.");
 });
 
-test("Gemini 429 then Mistral 200 -> source mistral", async () => {
-  const fetchImpl = fakeFetch({
-    [GEMINI]: () => new Response("{}", { status: 429 }),
-    [MISTRAL]: () => okResponse("Mistral here."),
-  });
-  const { handler } = setup({ fetchImpl });
-  const json = await (await handler(makeRequest())).json();
-  assert.equal(json.source, "mistral");
-  assert.equal(json.reply, "Mistral here.");
-  assert.deepEqual(fetchImpl.calls, [GEMINI, MISTRAL]);
-});
-
-for (const status of [400, 401, 403]) {
-  test(`Gemini ${status} falls through to Mistral -> 200 source mistral`, async () => {
-    const fetchImpl = fakeFetch({
-      [GEMINI]: () => new Response("{}", { status }),
-      [MISTRAL]: () => okResponse("Mistral rescue."),
-    });
-    const { handler } = setup({ fetchImpl });
+for (const status of [400, 401, 403, 404, 429, 500, 503]) {
+  test(`Groq ${status} -> canned reply with no retry or alternate provider`, async () => {
+    const fetchImpl = fakeFetch({ [GROQ]: () => new Response("{}", { status }) });
+    const { handler } = setup({ fetchImpl, env: {
+      ...GROQ_KEY, GEMINI_API_KEY: FAKE_KEY, MISTRAL_API_KEY: FAKE_KEY, OPENROUTER_API_KEY: FAKE_KEY,
+    } });
     const res = await handler(makeRequest());
     assert.equal(res.status, 200);
+    assertStandardHeaders(res);
     const json = await res.json();
-    assert.equal(json.source, "mistral");
-    assert.deepEqual(fetchImpl.calls, [GEMINI, MISTRAL]);
+    assert.equal(json.source, "fallback");
+    assert.ok(FALLBACK_REPLIES.allDown.includes(json.reply));
+    assert.deepEqual(fetchImpl.calls, [GROQ]);
   });
 }
 
-test("Gemini 422 -> 502 upstream_rejected and Mistral is never called", async () => {
-  const fetchImpl = fakeFetch({
-    [GEMINI]: () => new Response("{}", { status: 422 }),
-    [MISTRAL]: () => okResponse("should not be reached"),
-  });
+test("Groq 422 -> 502 upstream_rejected", async () => {
+  const fetchImpl = fakeFetch({ [GROQ]: () => new Response("{}", { status: 422 }) });
   const { handler } = setup({ fetchImpl });
   const res = await handler(makeRequest());
   assert.equal(res.status, 502);
   const err = await errorOf(res);
   assert.equal(err.code, "upstream_rejected");
   assertStandardHeaders(res);
-  assert.deepEqual(fetchImpl.calls, [GEMINI]);
+  assert.deepEqual(fetchImpl.calls, [GROQ]);
   assert.ok(FALLBACK_REPLIES.upstream.includes(err.message));
-});
-
-test("every provider 429 -> 200 source fallback with an allDown text", async () => {
-  const fetchImpl = fakeFetch({
-    [GEMINI]: () => new Response("{}", { status: 429 }),
-    [MISTRAL]: () => new Response("{}", { status: 429 }),
-    [GROQ]: () => new Response("{}", { status: 429 }),
-  });
-  const { handler } = setup({ fetchImpl, env: { ...BOTH_KEYS, GROQ_API_KEY: FAKE_KEY } });
-  const res = await handler(makeRequest());
-  assert.equal(res.status, 200);
-  assertStandardHeaders(res);
-  const json = await res.json();
-  assert.equal(json.source, "fallback");
-  assert.ok(FALLBACK_REPLIES.allDown.includes(json.reply));
-  assert.deepEqual(fetchImpl.calls, [GEMINI, MISTRAL, GROQ]);
-});
-
-test("both providers 503 -> 200 fallback", async () => {
-  const fetchImpl = fakeFetch({
-    [GEMINI]: () => new Response("{}", { status: 503 }),
-    [MISTRAL]: () => new Response("{}", { status: 503 }),
-  });
-  const { handler } = setup({ fetchImpl });
-  const json = await (await handler(makeRequest())).json();
-  assert.equal(json.source, "fallback");
-  assert.ok(FALLBACK_REPLIES.allDown.includes(json.reply));
 });
 
 test("thrown fetch errors never leak details and never produce a 500", async () => {
@@ -524,7 +481,7 @@ for (const value of ["10, 10", "abc", "-1", "1e9", ""]) {
     const { handler } = setup();
     const res = await handler(rawRequest({ headers: { "content-length": value }, body: chatBody() }));
     assert.equal(res.status, 200);
-    assert.equal((await res.json()).source, "gemini");
+    assert.equal((await res.json()).source, "groq");
   });
 }
 
@@ -583,7 +540,7 @@ test("Retry-After only on 429 and Allow only on 405", async () => {
 test("the outgoing provider request has SYSTEM_PROMPT first and the user message last", async () => {
   let sent;
   const fetchImpl = fakeFetch({
-    [GEMINI]: (_url, init) => {
+    [GROQ]: (_url, init) => {
       sent = JSON.parse(init.body);
       return okResponse("ok.");
     },
@@ -604,31 +561,18 @@ test("the outgoing provider request has SYSTEM_PROMPT first and the user message
 });
 
 test("a 900-char provider reply is capped at 700 chars in the response", async () => {
-  const fetchImpl = fakeFetch({ [GEMINI]: () => okResponse("word ".repeat(180)) });
+  const fetchImpl = fakeFetch({ [GROQ]: () => okResponse("word ".repeat(180)) });
   const { handler } = setup({ fetchImpl });
   const json = await (await handler(makeRequest())).json();
-  assert.equal(json.source, "gemini");
+  assert.equal(json.source, "groq");
   assert.ok(json.reply.length > 0 && json.reply.length <= LIMITS.MAX_REPLY_CHARS, String(json.reply.length));
-});
-
-test("Gemini 429 then Mistral 422 -> 502 upstream_rejected", async () => {
-  const fetchImpl = fakeFetch({
-    [GEMINI]: () => new Response("{}", { status: 429 }),
-    [MISTRAL]: () => new Response("{}", { status: 422 }),
-  });
-  const { handler } = setup({ fetchImpl, env: { ...BOTH_KEYS, GROQ_API_KEY: FAKE_KEY } });
-  const res = await handler(makeRequest());
-  assert.equal(res.status, 502);
-  assert.equal((await errorOf(res)).code, "upstream_rejected");
-  assert.deepEqual(fetchImpl.calls, [GEMINI, MISTRAL]);
 });
 
 test("logs never contain user text, the client IP, the key, or the reply", async () => {
   const logger = silentLogger();
   const REPLY = "unique-reply-marker-9917";
   const fetchImpl = fakeFetch({
-    [GEMINI]: () => new Response("{}", { status: 500 }),
-    [MISTRAL]: () => okResponse(REPLY),
+    [GROQ]: () => okResponse(REPLY),
   });
   const { handler } = setup({ fetchImpl, logger });
   const res = await handler(
@@ -683,13 +627,13 @@ test("error messages come from the in-character fallback pools", async () => {
 
 test("handleChat(request, deps) works with injected deps", async () => {
   const res = await handleChat(makeRequest(), {
-    env: BOTH_KEYS,
-    fetchImpl: fakeFetch({ [GEMINI]: () => okResponse("hello.") }),
+    env: GROQ_KEY,
+    fetchImpl: fakeFetch({ [GROQ]: () => okResponse("hello.") }),
     rateLimiter: createRateLimiter({ rules: [{ windowMs: 60_000, max: 5 }] }),
     logger: silentLogger(),
   });
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).source, "gemini");
+  assert.equal((await res.json()).source, "groq");
 });
 
 test("api/chat.js default export exposes fetch(request)", async () => {

@@ -1,6 +1,5 @@
 /**
- * Provider chain for the chat endpoint: Gemini, then Mistral, then optional Groq,
- * all through OpenAI-compatible chat-completions endpoints.
+ * Groq-only provider for the chat endpoint, through its OpenAI-compatible endpoint.
  *
  * Nothing in this module returns or logs a key, an upstream response body, a user
  * message or a model reply. Log lines are exactly { provider, status, reason, ms }.
@@ -11,20 +10,17 @@ import {
   PROVIDERS,
   PROVIDER_ORDER,
   FATAL_UPSTREAM_STATUSES,
-  GEMINI_REASONING_EFFORT_DEFAULT,
 } from "./config.js";
 
-/** @typedef {{ id: "gemini"|"mistral"|"groq", url: string, model: string, apiKey: string, maxTokens: number, extraBody: object }} Provider */
+/** @typedef {{ id: "groq", url: string, model: string, apiKey: string, maxTokens: number, extraBody: object }} Provider */
 
 /** @typedef {{ ok: true, text: string } | { ok: false, retryable: boolean, status: number | null, reason: "timeout"|"network"|"http"|"bad_json"|"empty" }} CallResult */
 
-/** @typedef {{ ok: true, text: string, source: "gemini"|"mistral"|"groq" } | { ok: false, fatal: boolean }} ChainResult */
+/** @typedef {{ ok: true, text: string, source: "groq" } | { ok: false, fatal: boolean }} ChainResult */
 
 /**
- * Providers in PROVIDER_ORDER whose key env var is a non-empty string.
- * Gemini: maxTokens = GEMINI_MAX_OUTPUT_TOKENS, extraBody = { reasoning_effort }
- * unless GEMINI_REASONING_EFFORT === "" (then {}).
- * Others: maxTokens = MAX_OUTPUT_TOKENS, extraBody = {}.
+ * Configure one Groq request using one key. Other providers' keys are ignored.
+ * GPT-OSS uses low reasoning effort and omits reasoning from the response.
  * @param {Record<string, string | undefined>} env
  * @returns {Provider[]}
  */
@@ -32,17 +28,15 @@ export function buildProviderChain(env) {
   const chain = [];
   for (const id of PROVIDER_ORDER) {
     const def = PROVIDERS[id];
-    const apiKey = env[def.keyEnv];
-    if (typeof apiKey !== "string" || apiKey === "") continue;
+    const rawKey = env[def.keyEnv];
+    const apiKey = typeof rawKey === "string" ? rawKey.trim() : "";
+    if (!apiKey) continue;
 
     const model = env[def.modelEnv] || def.defaultModel;
-    let maxTokens = LIMITS.MAX_OUTPUT_TOKENS;
-    let extraBody = {};
-    if (id === "gemini") {
-      maxTokens = LIMITS.GEMINI_MAX_OUTPUT_TOKENS;
-      const effort = env.GEMINI_REASONING_EFFORT ?? GEMINI_REASONING_EFFORT_DEFAULT;
-      if (effort !== "") extraBody = { reasoning_effort: effort };
-    }
+    const maxTokens = LIMITS.MAX_OUTPUT_TOKENS;
+    const extraBody = model.startsWith("openai/gpt-oss-")
+      ? { reasoning_effort: "low", include_reasoning: false }
+      : {};
     chain.push({ id, url: def.url, model, apiKey, maxTokens, extraBody });
   }
   return chain;
@@ -102,7 +96,7 @@ export async function callProvider(provider, messages, { fetchImpl = fetch, time
       ...messages.map(({ role, content }) => ({ role, content })),
     ],
     temperature: LIMITS.TEMPERATURE,
-    max_tokens: provider.maxTokens,
+    max_completion_tokens: provider.maxTokens,
     stream: false,
     ...provider.extraBody,
   };
@@ -202,9 +196,8 @@ function discardBody(res) {
 }
 
 /**
- * Try each provider in order within the total time budget.
- * Only the statuses in FATAL_UPSTREAM_STATUSES (422) stop the chain; 400, 401, 403 and every
- * other failure fall through to the next provider.
+ * Make a single Groq attempt within the time budget. Only HTTP 422 is fatal;
+ * other failures use the canned reply without retrying or calling another provider.
  * @param {Provider[]} chain
  * @param {{ role: string, content: string }[]} messages
  * @param {{ fetchImpl?: typeof fetch, systemPrompt: string, now?: () => number, logger?: { info: Function, warn: Function }, limits?: typeof LIMITS }} options
