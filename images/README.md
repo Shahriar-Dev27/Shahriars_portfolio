@@ -9,7 +9,7 @@ The interface intentionally shows designed filename placeholders when any listed
 - `socialpage.png` — statement-section portrait. Dimensions 1122×1402, lazy-loaded.
 
 ### Project case studies
-- `projects/BizStudio.png` — BizGuide AI case study image. Dimensions 1895×905.
+- `projects/BizStudio.png` — BizGuide AI cream-and-orange homepage screenshot. Dimensions 1811×841.
 - `projects/CareCompass.png` — CareCompass case study image.
 - `projects/gocart.png` — gocart case study image.
 
@@ -36,6 +36,6 @@ These files exist in the folder but are not linked by `index.html` or `script.js
 
 ## Asset policy
 
-- Keep the declared aspect ratios for any final replacements (hero 1067×1402, statement 1122×1402, project 1895×905).
+- Keep the declared aspect ratios for any final replacements (hero 1067×1402, statement 1122×1402, BizGuide AI 1811×841). Match project image metadata and preview framing to each screenshot's actual dimensions.
 - Keep lower-page images lazy-loaded (`loading="lazy"`, `decoding="async"`).
 - Replace generated or temporary imagery with honest project screenshots or final editorial photography before launch. Do not use random online imagery.

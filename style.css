@@ -2904,7 +2904,9 @@ body[data-portfolio-mode="develop"] .skill-panel__eyebrow {
 }
 
 .project-card[data-project-id="bizguide-ai"] .project-card__thumb {
-  background: var(--color-black);
+  width: clamp(14rem, 24vw, 22rem);
+  aspect-ratio: 1811 / 841;
+  background: #f5ecdd;
 }
 
 .project-card[data-project-id="bizguide-ai"] .project-card__thumb img {
@@ -3109,9 +3111,9 @@ body[data-portfolio-mode="develop"] .skill-panel__eyebrow {
 }
 
 .project-dialog[data-project-id="bizguide-ai"] .project-dialog__media {
-  aspect-ratio: 1895 / 905;
+  aspect-ratio: 1811 / 841;
   border-radius: var(--radius-md);
-  background: var(--color-black);
+  background: #f5ecdd;
 }
 
 .project-dialog[data-project-id="bizguide-ai"] .project-dialog__media img {
@@ -5327,7 +5329,7 @@ main>section {
   }
 
   .project-dialog[data-project-id="bizguide-ai"] .project-dialog__media {
-    aspect-ratio: 1895 / 905;
+    aspect-ratio: 1811 / 841;
   }
 
   .project-dialog__gallery {

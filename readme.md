@@ -84,7 +84,7 @@ The_Portfolio/
 │   ├── socialpage.png              # Statement section portrait (1122×1402)
 │   ├── screenshotPortfolio.png     # Portfolio preview screenshot
 │   └── projects/
-│       ├── BizStudio.png           # BizGuide AI case study image (1895×905)
+│       ├── BizStudio.png           # BizGuide AI case study image (1811×841)
 │       ├── CareCompass.png         # CareCompass case study image
 │       ├── gocart.png              # gocart case study image
 │       └── A-Day-in-Dhaka.png      # Storyboard traffic scene screenshot (1920×945)
