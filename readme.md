@@ -68,7 +68,9 @@ The_Portfolio/
 ├── script.js               # Core portfolio logic (modes, interactions, dialogs, filters)
 ├── liquid-background.js    # WebGL liquid background effect
 ├── api/                    # AI chat serverless function (/api/chat) and its modules
-├── scripts/                # Local dev server (npm run dev / npm run dev:mock)
+├── scripts/                # Dev server and image tooling
+│   ├── dev-server.js       # Local dev server (npm run dev / npm run dev:mock)
+│   └── optimize-images.mjs # One-off PNG to WebP optimizer (sharp, --no-save)
 ├── tests/                  # node:test suite (npm test)
 ├── package.json            # npm scripts only; no runtime dependencies
 ├── vercel.json             # Function limit and security headers
@@ -80,16 +82,18 @@ The_Portfolio/
 │   └── gmail.png
 ├── images/
 │   ├── agent-avatar.svg            # SID.agent chat avatar (illustrated portrait)
-│   ├── developer-placeholder.png   # Hero portrait (1067×1402)
-│   ├── socialpage.png              # Statement section portrait (1122×1402)
+│   ├── developer-placeholder.webp  # Hero portrait (1067×1402)
+│   ├── socialpage.webp             # Statement section portrait (800×1000)
 │   ├── screenshotPortfolio.png     # Portfolio preview screenshot
 │   └── projects/
-│       ├── BizStudio.png           # BizGuide AI case study image (1811×841)
-│       ├── CareCompass.png         # CareCompass case study image
-│       ├── gocart.png              # gocart case study image
-│       └── A-Day-in-Dhaka.png      # Storyboard traffic scene screenshot (1920×945)
+│       ├── BizStudio.webp          # BizGuide AI case study image (1600×743)
+│       ├── CareCompass.webp        # CareCompass case study image (1600×786)
+│       ├── velune.webp             # VELUNE case study image (1600×855)
+│       └── A-Day-in-Dhaka.webp     # Storyboard traffic scene screenshot (1600×788)
 └── README.md               # This file
 ```
+
+The original PNG masters are kept alongside the optimized files in `images/`, but the site serves the `.webp` versions. See `images/README.md` for the manifest and how to regenerate them.
 
 > **Note:** No build tooling, bundlers, or package managers required. Open `index.html` directly or serve via any static server. The optional AI chat is the only part that needs a runtime: one Vercel serverless function (`api/chat.js`) on Node 24, with no build step and no npm dependencies. The page works without it; the chat widget just needs `/api/chat`.
 
@@ -196,10 +200,11 @@ This portfolio is open source for learning and inspiration. Feel free to explore
 - **Keyboard navigable** — Arrow keys, Home/End, Enter/Space activation
 
 ### 4. Selected Work (`#work`)
-- **Three self-directed products:**
+- **Four self-directed products:**
   1. **BizGuide AI** — Bangladesh-first business planning product (Full-Stack)
   2. **CareCompass** — Healthcare discovery & appointment booking platform (Full-Stack)
-  3. **gocart** — Immersive 3D commerce experience (Experiment/Frontend)
+  3. **VELUNE** — Editorial fashion storefront (Experiment/Frontend)
+  4. **A Day in Dhaka** — Illustrated scroll storyboard (Frontend)
 - **Filter tabs** — All, Frontend, Full-stack, Experiments
 - **Project dialog** — Case study with overview, challenge, approach, implementation, outcome, technologies, live/source links, gallery, prev/next navigation
 - **No-JS fallback** — Static list in `<noscript>`
@@ -255,7 +260,7 @@ Edit the **project data object** in `script.js` (look for `projectData` or simil
   title: 'BizGuide AI',
   year: '2026',
   role: 'Product Design / Full-Stack Development',
-  image: 'images/projects/BizStudio.png',
+  image: 'images/projects/BizStudio.webp',
   imageAlt: 'Descriptive alt text',
   liveUrl: 'https://...',        // optional
   repoUrl: 'https://...',        // optional

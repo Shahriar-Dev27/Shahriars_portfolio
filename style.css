@@ -2904,13 +2904,29 @@ body[data-portfolio-mode="develop"] .skill-panel__eyebrow {
 }
 
 .project-card[data-project-id="bizguide-ai"] .project-card__thumb {
-  width: clamp(14rem, 24vw, 22rem);
+  width: clamp(18rem, 32vw, 30rem);
   aspect-ratio: 1811 / 841;
+  border: 1px solid rgb(37 40 31 / 20%);
+  border-radius: 0.5rem;
   background: #f5ecdd;
+  box-shadow: 0 1.25rem 3rem rgb(0 0 0 / 24%);
 }
 
 .project-card[data-project-id="bizguide-ai"] .project-card__thumb img {
   object-fit: contain;
+  object-position: center;
+}
+
+.project-card[data-project-id="velune"] .project-card__thumb {
+  width: clamp(16rem, 28vw, 26rem);
+  aspect-ratio: 1680 / 898;
+  background: #241e17;
+}
+
+.project-card[data-project-id="velune"] .project-card__thumb img,
+.project-dialog[data-project-id="velune"] .project-dialog__media img {
+  object-fit: contain;
+  object-position: center;
 }
 
 .project-card__open {
@@ -3112,13 +3128,19 @@ body[data-portfolio-mode="develop"] .skill-panel__eyebrow {
 
 .project-dialog[data-project-id="bizguide-ai"] .project-dialog__media {
   aspect-ratio: 1811 / 841;
-  border-radius: var(--radius-md);
+  border: 1px solid rgb(37 40 31 / 20%);
+  border-radius: 0.5rem;
   background: #f5ecdd;
 }
 
 .project-dialog[data-project-id="bizguide-ai"] .project-dialog__media img {
   object-fit: contain;
   object-position: center;
+}
+
+.project-dialog[data-project-id="velune"] .project-dialog__media {
+  aspect-ratio: 1680 / 898;
+  background: #241e17;
 }
 
 .project-dialog__gallery {
@@ -5808,7 +5830,7 @@ main>section {
   translate: 0 var(--hero-word-drift, 0);
 }
 
-.project-card:not([data-project-id="bizguide-ai"]) .project-card__thumb img {
+.project-card:not([data-project-id="bizguide-ai"]):not([data-project-id="velune"]) .project-card__thumb img {
   scale: 1.13;
   translate: 0 var(--media-shift, 0);
   will-change: translate;

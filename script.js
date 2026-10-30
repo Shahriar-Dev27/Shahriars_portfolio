@@ -180,9 +180,9 @@ const projectData = [
     caseType: "Self-directed project",
     summary: "A Bangladesh-first planning experience that helps founders examine location, budget, demand, timing, and risk before committing resources.",
     outcome: "Published as a live, responsive product prototype with transparent demo-data boundaries.",
-    image: "images/projects/BizStudio.png",
-    imageWidth: 1811,
-    imageHeight: 841,
+    image: "images/projects/BizStudio.webp",
+    imageWidth: 1600,
+    imageHeight: 743,
     imageAlt: "BizGuide AI cream-and-orange homepage with the headline Big idea. What's next?, a business planning prompt, and an illustrative advisor conversation",
     liveUrl: "https://bizguideai.vercel.app/",
     repositoryUrl: null,
@@ -211,9 +211,9 @@ const projectData = [
     caseType: "Self-directed project",
     summary: "A care discovery experience that helps patients search by symptoms, compare available clinicians, and book an appointment quickly.",
     outcome: "A calm, accessible path from a health concern to a confirmed appointment.",
-    image: "images/projects/CareCompass.png",
-    imageWidth: 1811,
-    imageHeight: 890,
+    image: "images/projects/CareCompass.webp",
+    imageWidth: 1600,
+    imageHeight: 786,
     imageAlt: "CareCompass homepage with symptom search, available doctors, appointment times, and an AI-assisted care prompt",
     liveUrl: "https://care-compass-seven.vercel.app",
     repositoryUrl: null,
@@ -231,34 +231,34 @@ const projectData = [
     },
   },
   {
-    id: "gocart",
+    id: "velune",
     number: "03",
-    title: "gocart",
+    title: "VELUNE",
     category: "experiment",
-    type: "Immersive 3D Commerce Experience",
+    type: "Editorial Fashion Storefront",
     year: "2026",
     role: "Creative Development / Product Design",
     status: "View project",
     caseType: "Self-directed project",
-    summary: "An immersive storefront that turns product discovery into a spatial, motion-led shopping experience.",
-    outcome: "A distinctive commerce concept that keeps search, categories, and cart actions familiar inside an expressive 3D environment.",
-    image: "images/projects/gocart.png",
-    imageWidth: 1872,
-    imageHeight: 875,
-    imageAlt: "gocart homepage with floating 3D products, spatial grid, product cards, search, categories, and shopping bag controls",
-    liveUrl: "https://gocart-a6c142gnq-shahriar4.vercel.app/",
+    summary: "An editorial fashion storefront pairing cinematic imagery, oversized serif typography, and a restrained collection-first shopping experience.",
+    outcome: "A distinctive fashion identity with a clear path from the seasonal campaign to collections and a curated selection.",
+    image: "images/projects/velune.webp",
+    imageWidth: 1600,
+    imageHeight: 855,
+    imageAlt: "VELUNE Between Hours fashion campaign with oversized ivory serif type and a flowing black dress against sunlit stone architecture and a coastal sunset",
+    liveUrl: "https://gocart-three-nu.vercel.app/",
     repositoryUrl: null,
-    technologies: ["3D Product UI", "Motion", "Responsive Design", "E-commerce UX"],
-    designTechnologies: ["3D Product UI", "Motion"],
+    technologies: ["Art Direction", "Editorial UI", "Responsive Design", "E-commerce UX"],
+    designTechnologies: ["Art Direction", "Editorial UI"],
     developTechnologies: ["Responsive Design", "E-commerce UX"],
     theme: "dark",
     layout: "wide",
     details: {
-      overview: "A 3D commerce concept where curated products live inside an interactive, spatial storefront.",
-      challenge: "Use motion and depth to create character without hiding the familiar controls people need to browse and shop.",
-      approach: "Keep search, categories, featured products, account, and bag actions recognizable while using floating objects and a perspective grid for atmosphere.",
-      implementation: "Built as a responsive commerce interface with animated product presentation, category navigation, discovery search, and conventional shopping controls.",
-      result: "An expressive storefront concept that balances visual experimentation with an understandable shopping path.",
+      overview: "VELUNE is a self-directed fashion commerce concept built around Between Hours, a seasonal campaign exploring form, light, and movement. Warm stone, coastal light, and flowing silhouettes set the tone for an editorial shopping experience.",
+      challenge: "Give a fashion storefront the atmosphere of a campaign while keeping collection discovery and selection controls easy to find.",
+      approach: "Pair full-bleed campaign imagery with oversized serif headlines, a warm neutral palette, and restrained navigation. A clear collection call to action connects the visual story to product discovery.",
+      implementation: "The storefront interface brings together seasonal campaign content, collections and capsule navigation, and a visible selection count. The visual hierarchy uses generous spacing and contrasting type scales to keep the campaign and shopping controls distinct.",
+      result: "A published fashion storefront concept with a cohesive editorial identity and a direct invitation to explore the collection.",
     },
   },
   {
@@ -273,9 +273,9 @@ const projectData = [
     caseType: "Self-directed frontend storyboard",
     summary: "A Bangla-led illustrated story following Mama's Tong and its neighbourhood through an ordinary day in Dhaka, from the first cup of chai to the closing phone call.",
     outcome: "Nine scroll-driven scenes combine original illustration, bilingual captions, and optional city ambience and Bangla voices.",
-    image: "images/projects/A-Day-in-Dhaka.png",
-    imageWidth: 1920,
-    imageHeight: 945,
+    image: "images/projects/A-Day-in-Dhaka.webp",
+    imageWidth: 1600,
+    imageHeight: 788,
     imageAlt: "A Day in Dhaka morning traffic scene with colourful rickshaws, buses, Bangla shop signs, and a metro train on the elevated tracks",
     liveUrl: "https://a-day-in-dhaka-city.dipshahriarislam.workers.dev/",
     repositoryUrl: "https://github.com/Shahriar-Dev27/A-day-In-Dhaka-City-",
@@ -791,8 +791,8 @@ function loadHeroImages(images) {
   });
 
   return Promise.all([
-    waitForImage(images.bw, "images/developer-placeholder.png (grayscale layer)"),
-    waitForImage(images.color, "images/developer-placeholder.png (colour layer)"),
+    waitForImage(images.bw, "images/developer-placeholder.webp (grayscale layer)"),
+    waitForImage(images.color, "images/developer-placeholder.webp (colour layer)"),
   ]).then(([bwLoaded, colorLoaded]) => bwLoaded && colorLoaded);
 }
 
@@ -2289,7 +2289,7 @@ function initScrollReveals() {
 
   /* Project imagery parallax inside its frame, via CSS vars to stay
      composable with the existing hover transforms. */
-  document.querySelectorAll(".project-card:not([data-project-id='bizguide-ai']) .project-card__thumb").forEach((media) => {
+  document.querySelectorAll(".project-card:not([data-project-id='bizguide-ai']):not([data-project-id='velune']) .project-card__thumb").forEach((media) => {
     extraTweens.push(gsap.fromTo(media, { "--media-shift": "-5.5%" }, {
       "--media-shift": "5.5%",
       ease: "none",
@@ -2588,7 +2588,7 @@ function initCircularText() {
   root.addEventListener("focusout", resumeCircularStatement);
   const imageWrap = root.querySelector("[data-statement-image-wrap]");
   const image = imageWrap?.querySelector("img");
-  if (imageWrap && image) configureImageFallback(imageWrap, image, "images/portrait-small.jpg");
+  if (imageWrap && image) configureImageFallback(imageWrap, image, "images/socialpage.webp");
   if ("IntersectionObserver" in window) {
     statementRuntime.observer = new IntersectionObserver(([entry]) => setCircularStatementVisibility(Boolean(entry?.isIntersecting)), { threshold: 0.1 });
     statementRuntime.observer.observe(root);

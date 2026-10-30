@@ -64,7 +64,7 @@ function factsStackEntries() {
   );
 }
 
-/** Projects whose `technologies` are real stack names. CareCompass and gocart list UX tags instead. */
+/** Projects whose `technologies` are real stack names. CareCompass and VELUNE list UX tags instead. */
 const STACK_PROJECTS = ["BizGuide AI", "A Day in Dhaka"];
 
 test("project sync: script.js has at least four project titles and each appears in FACTS", () => {
